@@ -1,11 +1,16 @@
 package com.pickaid.pmmojs.contents.settings;
 
 import dev.latvian.mods.kubejs.typings.Info;
+import dev.latvian.mods.rhino.util.HideFromJS;
 import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.APIUtils.SalvageBuilder;
 import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.item.Item;
+import net.minecraftforge.registries.ForgeRegistries;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -21,9 +26,18 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
         super(objectType, objectId);
     }
 
+    @Info("""
+            Sets the object as an override.
+            You must enable this to change vanilla stuff.
+            """)
+    public ItemSettingsBuilder override(boolean override) {
+        this.isOverride = override;
+        return this;
+    }
+
     @Info("Creates a new salvage configuration for the specified result item")
-    public SalvageConfigBuilder salvage(String resultItem) {
-        return new SalvageConfigBuilder(this, new ResourceLocation(resultItem));
+    public SalvageConfigBuilder salvage(Item resultItem) {
+        return new SalvageConfigBuilder(this, resultItem.kjs$getIdLocation());
     }
 
     @Info("Sets the vein miner charge capacity")
@@ -55,6 +69,7 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
         APIUtils.registerVeinData(objectType, objectId, intChargeCap, doubleChargeRate, intConsumeAmount, isOverride);
     }
 
+    @HideFromJS
     ItemSettingsBuilder registerSalvage() {
         if (!salvageData.isEmpty()) {
             APIUtils.registerSalvage(objectId, salvageData, isOverride);
@@ -63,10 +78,10 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
     }
 
     @Info("Registers positive effect bonuses")
-    public ItemSettingsBuilder positiveEffects(Map<ResourceLocation, ? extends Number> effects) {
+    public ItemSettingsBuilder positiveEffects(Map<MobEffect, ? extends Number> effects) {
         Map<ResourceLocation, Integer> intEffects = new HashMap<>();
-        for (Map.Entry<ResourceLocation, ? extends Number> entry : effects.entrySet()) {
-            intEffects.put(entry.getKey(), entry.getValue().intValue());
+        for (Map.Entry<MobEffect, ? extends Number> entry : effects.entrySet()) {
+            intEffects.put(ForgeRegistries.MOB_EFFECTS.getKey(entry.getKey()), entry.getValue().intValue());
         }
 
         APIUtils.registerPositiveEffect(objectType, objectId, intEffects, isOverride);
@@ -74,10 +89,10 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
     }
 
     @Info("Registers negative effect penalties")
-    public ItemSettingsBuilder negativeEffects(Map<ResourceLocation, ? extends Number> effects) {
+    public ItemSettingsBuilder negativeEffects(Map<MobEffect, ? extends Number> effects) {
         Map<ResourceLocation, Integer> intEffects = new HashMap<>();
-        for (Map.Entry<ResourceLocation, ? extends Number> entry : effects.entrySet()) {
-            intEffects.put(entry.getKey(), entry.getValue().intValue());
+        for (Map.Entry<MobEffect, ? extends Number> entry : effects.entrySet()) {
+            intEffects.put(ForgeRegistries.MOB_EFFECTS.getKey(entry.getKey()), entry.getValue().intValue());
         }
 
         APIUtils.registerNegativeEffect(objectType, objectId, intEffects, isOverride);
@@ -85,16 +100,16 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
     }
 
     @Info("Sets a specific positive effect")
-    public ItemSettingsBuilder setPositiveEffect(String effectId, Number level) {
-        Map<ResourceLocation, Integer> effects = new HashMap<>();
-        effects.put(new ResourceLocation(effectId), level.intValue());
+    public ItemSettingsBuilder setPositiveEffect(MobEffect effect, Number level) {
+        Map<MobEffect, Integer> effects = new HashMap<>();
+        effects.put(effect, level.intValue());
         return positiveEffects(effects);
     }
 
     @Info("Sets a specific negative effect")
-    public ItemSettingsBuilder setNegativeEffect(String effectId, Number level) {
-        Map<ResourceLocation, Integer> effects = new HashMap<>();
-        effects.put(new ResourceLocation(effectId), level.intValue());
+    public ItemSettingsBuilder setNegativeEffect(MobEffect effect, Number level) {
+        Map<MobEffect, Integer> effects = new HashMap<>();
+        effects.put(effect, level.intValue());
         return negativeEffects(effects);
     }
 
@@ -135,7 +150,6 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
 
     @Info("Registers XP gain bonuses for the specified modifier type")
     public ItemSettingsBuilder xpBonus(ModifierDataType modifierType, Map<String, ? extends Number> bonuses) {
-        // Convert Number values to Double
         Map<String, Double> doubleBonuses = new HashMap<>();
         for (Map.Entry<String, ? extends Number> entry : bonuses.entrySet()) {
             doubleBonuses.put(entry.getKey(), entry.getValue().doubleValue());
@@ -270,7 +284,7 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
         }
 
         @Info("Adds another salvage result item to configure")
-        public SalvageConfigBuilder and(String resultItem) {
+        public SalvageConfigBuilder and(Item resultItem) {
             return parent.salvage(resultItem);
         }
     }

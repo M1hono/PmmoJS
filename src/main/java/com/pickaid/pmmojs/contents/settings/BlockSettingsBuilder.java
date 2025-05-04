@@ -16,6 +16,16 @@ public class BlockSettingsBuilder extends PMMOSettingsBuilder {
         super(objectType, objectId);
     }
 
+
+    @Info("""
+            Sets the object as an override.
+            You must enable this to change vanilla stuff.
+            """)
+    public BlockSettingsBuilder override(boolean override) {
+        this.isOverride = override;
+        return this;
+    }
+
     @Info("Sets the vein miner charge capacity")
     public BlockSettingsBuilder veinChargeCap(int chargeCap) {
         this.veinChargeCap = Optional.of(chargeCap);

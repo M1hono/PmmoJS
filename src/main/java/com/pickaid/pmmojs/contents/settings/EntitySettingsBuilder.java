@@ -14,6 +14,15 @@ public class EntitySettingsBuilder extends PMMOSettingsBuilder {
         super(objectType, objectId);
     }
 
+    @Info("""
+            Sets the object as an override.
+            You must enable this to change vanilla stuff.
+            """)
+    public EntitySettingsBuilder override(boolean override) {
+        this.isOverride = override;
+        return this;
+    }
+
     @Info("Registers damage-specific XP awards")
     public EntitySettingsBuilder damageXp(boolean isDealt, String damageType, Map<String, ? extends Number> xpAwards) {
         // Convert Number values to Long

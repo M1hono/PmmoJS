@@ -15,6 +15,15 @@ public class GenericSettingsBuilder extends PMMOSettingsBuilder {
         super(objectType, objectId);
     }
 
+    @Info("""
+            Sets the object as an override.
+            You must enable this to change vanilla stuff.
+            """)
+    public GenericSettingsBuilder override(boolean override) {
+        this.isOverride = override;
+        return this;
+    }
+
     @Info("Sets bonus modifiers for this object")
     public GenericSettingsBuilder bonus(ModifierDataType type, Map<String, Double> bonuses) {
         if (objectType == ObjectType.ITEM || objectType == ObjectType.BIOME ||

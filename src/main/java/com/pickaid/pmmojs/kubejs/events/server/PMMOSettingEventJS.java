@@ -6,16 +6,25 @@ import dev.latvian.mods.kubejs.KubeJS;
 import dev.latvian.mods.kubejs.event.EventJS;
 import dev.latvian.mods.kubejs.script.ScriptType;
 import dev.latvian.mods.kubejs.typings.Info;
+import dev.latvian.mods.kubejs.util.ConsoleJS;
 import dev.latvian.mods.kubejs.util.UtilsJS;
+import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.enums.ObjectType;
+import harmonised.pmmo.api.enums.ReqType;
+import harmonised.pmmo.config.codecs.DataSource;
 import harmonised.pmmo.core.Core;
+import net.minecraft.client.gui.font.providers.UnihexProvider;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -44,14 +53,14 @@ public class PMMOSettingEventJS extends EventJS {
     }
 
     @Info("Creates a new biome settings builder for the specified object ID")
-    public LocationSettingsBuilder biome(ResourceKey<Biome> object) {
-        ResourceLocation resLoc = object.location();
+    public LocationSettingsBuilder biome(String object) {
+        ResourceLocation resLoc = ResourceLocation.tryParse(object);
         return new LocationSettingsBuilder(ObjectType.BIOME, resLoc);
     }
 
     @Info("Creates a new dimension settings builder for the specified object ID")
-    public LocationSettingsBuilder dimension(ResourceKey<Level> object) {
-        ResourceLocation resLoc = object.location();
+    public LocationSettingsBuilder dimension(String object) {
+        ResourceLocation resLoc = ResourceLocation.tryParse(object);
         return new LocationSettingsBuilder(ObjectType.DIMENSION, resLoc);
     }
 
@@ -76,7 +85,37 @@ public class PMMOSettingEventJS extends EventJS {
         }
     }
 
-    public void clear() {
-        Core.get(LogicalSide.SERVER).getLoader().resetData();
+    @Info("""
+            Instead of setting, it's actually overide the vanilla settings.
+            Useful when you want to reset vanilla settings.
+            """)
+    public void clearVanillaItemSettings() {
+        for (ObjectType type : ObjectType.values()) {
+            for (ReqType reqType : ReqType.values()) {
+                BuiltInRegistries.ITEM.forEach(item -> {
+                    APIUtils.registerRequirement(type, item.kjs$getIdLocation(), reqType, Map.of("combat", 0), true);
+                });
+            }
+        }
+    }
+
+    public void clearVanillaBlockSettings() {
+        for (ObjectType type : ObjectType.values()) {
+            for (ReqType reqType : ReqType.values()) {
+                BuiltInRegistries.BLOCK.forEach(block -> {
+                    APIUtils.registerRequirement(type, block.kjs$getIdLocation(), reqType, Map.of("combat", 0), true);
+                });
+            }
+        }
+    }
+
+    public void clearVanillaEntitySettings() {
+        for (ObjectType type : ObjectType.values()) {
+            for (ReqType reqType : ReqType.values()) {
+                BuiltInRegistries.ENTITY_TYPE.forEach(entity -> {
+                    APIUtils.registerRequirement(type, ForgeRegistries.ENTITY_TYPES.getKey(entity), reqType, Map.of("combat", 0), true);
+                });
+            }
+        }
     }
 }

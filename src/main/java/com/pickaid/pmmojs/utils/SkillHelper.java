@@ -38,6 +38,6 @@ public class SkillHelper {
     }
 
     public static SkillData getSkill(String skill) {
-        return SkillsConfig.SKILLS.get().get(skill);
+        return SkillsConfig.SKILLS.get().getOrDefault(skill, SkillData.Builder.getDefault());
     }
 }

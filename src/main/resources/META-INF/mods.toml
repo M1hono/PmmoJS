@@ -43,10 +43,3 @@ mandatory = true
 versionRange = "[1.7.35,)"
 ordering = "NONE"
 side = "BOTH"
-
-[[dependencies.pmmojs]]
-modId = "yet_another_config_lib_v3"
-mandatory = false
-versionRange = "[3.2.2,)"
-ordering = "NONE"
-side = "CLIENT"

@@ -13,20 +13,11 @@ import java.util.Map;
 public abstract class PMMOSettingsBuilder {
     protected final ObjectType objectType;
     protected final ResourceLocation objectId;
-    protected boolean isOverride = false;
+    protected boolean isOverride = true;
 
     public PMMOSettingsBuilder(ObjectType objectType, ResourceLocation objectId) {
         this.objectType = objectType;
         this.objectId = objectId;
-    }
-
-    @Info("""
-            Sets the object as an override.
-            You must enable this to change vanilla stuff.
-            """)
-    public PMMOSettingsBuilder override() {
-        isOverride = true;
-        return this;
     }
 
     @Info("Sets a specific skill requirement level")

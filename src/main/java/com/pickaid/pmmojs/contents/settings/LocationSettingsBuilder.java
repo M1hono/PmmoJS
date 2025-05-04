@@ -6,7 +6,12 @@ import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
 import harmonised.pmmo.config.codecs.MobModifier;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraftforge.registries.ForgeRegistries;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,11 +23,20 @@ public class LocationSettingsBuilder extends PMMOSettingsBuilder {
         super(objectType, objectId);
     }
 
+    @Info("""
+            Sets the object as an override.
+            You must enable this to change vanilla stuff.
+            """)
+    public LocationSettingsBuilder override(boolean override) {
+        this.isOverride = override;
+        return this;
+    }
+
     @Info("Registers positive effect bonuses")
-    public LocationSettingsBuilder positiveEffects(Map<ResourceLocation, ? extends Number> effects) {
+    public LocationSettingsBuilder positiveEffects(Map<MobEffect, ? extends Number> effects) {
         Map<ResourceLocation, Integer> intEffects = new HashMap<>();
-        for (Map.Entry<ResourceLocation, ? extends Number> entry : effects.entrySet()) {
-            intEffects.put(entry.getKey(), entry.getValue().intValue());
+        for (Map.Entry<MobEffect, ? extends Number> entry : effects.entrySet()) {
+            intEffects.put(ForgeRegistries.MOB_EFFECTS.getKey(entry.getKey()), entry.getValue().intValue());
         }
 
         APIUtils.registerPositiveEffect(objectType, objectId, intEffects, isOverride);
@@ -30,10 +44,10 @@ public class LocationSettingsBuilder extends PMMOSettingsBuilder {
     }
 
     @Info("Registers negative effect penalties")
-    public LocationSettingsBuilder negativeEffects(Map<ResourceLocation, ? extends Number> effects) {
+    public LocationSettingsBuilder negativeEffects(Map<MobEffect, ? extends Number> effects) {
         Map<ResourceLocation, Integer> intEffects = new HashMap<>();
-        for (Map.Entry<ResourceLocation, ? extends Number> entry : effects.entrySet()) {
-            intEffects.put(entry.getKey(), entry.getValue().intValue());
+        for (Map.Entry<MobEffect, ? extends Number> entry : effects.entrySet()) {
+            intEffects.put(ForgeRegistries.MOB_EFFECTS.getKey(entry.getKey()), entry.getValue().intValue());
         }
 
         APIUtils.registerNegativeEffect(objectType, objectId, intEffects, isOverride);
@@ -41,16 +55,16 @@ public class LocationSettingsBuilder extends PMMOSettingsBuilder {
     }
 
     @Info("Sets a specific positive effect")
-    public LocationSettingsBuilder setPositiveEffect(String effectId, Number level) {
-        Map<ResourceLocation, Integer> effects = new HashMap<>();
-        effects.put(new ResourceLocation(effectId), level.intValue());
+    public LocationSettingsBuilder setPositiveEffect(MobEffect effect, Number level) {
+        Map<MobEffect, Integer> effects = new HashMap<>();
+        effects.put(effect, level.intValue());
         return positiveEffects(effects);
     }
 
     @Info("Sets a specific negative effect")
-    public LocationSettingsBuilder setNegativeEffect(String effectId, Number level) {
-        Map<ResourceLocation, Integer> effects = new HashMap<>();
-        effects.put(new ResourceLocation(effectId), level.intValue());
+    public LocationSettingsBuilder setNegativeEffect(MobEffect effect, Number level) {
+        Map<MobEffect, Integer> effects = new HashMap<>();
+        effects.put(effect, level.intValue());
         return negativeEffects(effects);
     }
 
@@ -91,25 +105,25 @@ public class LocationSettingsBuilder extends PMMOSettingsBuilder {
         }
 
         @Info("Adds a mob attribute modifier with the specified attribute, amount, and operation")
-        public MobModifierBuilder attribute(String attributeId, Number amount, AttributeModifier.Operation operation) {
-            MobModifier modifier = new MobModifier(new ResourceLocation(attributeId), amount.doubleValue(), operation);
+        public MobModifierBuilder attribute(Attribute attribute, Number amount, AttributeModifier.Operation operation) {
+            MobModifier modifier = new MobModifier(ForgeRegistries.ATTRIBUTES.getKey(attribute), amount.doubleValue(), operation);
             modifiers.add(modifier);
             return this;
         }
 
         @Info("Adds a health attribute modifier with the specified multiplier")
         public MobModifierBuilder health(Number multiplier) {
-            return attribute("minecraft:generic.max_health", multiplier, AttributeModifier.Operation.MULTIPLY_BASE);
+            return attribute(Attributes.MAX_HEALTH, multiplier, AttributeModifier.Operation.MULTIPLY_BASE);
         }
 
         @Info("Adds a damage attribute modifier with the specified multiplier")
         public MobModifierBuilder damage(Number multiplier) {
-            return attribute("minecraft:generic.attack_damage", multiplier, AttributeModifier.Operation.MULTIPLY_BASE);
+            return attribute(Attributes.ATTACK_DAMAGE, multiplier, AttributeModifier.Operation.MULTIPLY_BASE);
         }
 
         @Info("Adds a speed attribute modifier with the specified multiplier")
         public MobModifierBuilder speed(Number multiplier) {
-            return attribute("minecraft:generic.movement_speed", multiplier, AttributeModifier.Operation.MULTIPLY_BASE);
+            return attribute(Attributes.MOVEMENT_SPEED, multiplier, AttributeModifier.Operation.MULTIPLY_BASE);
         }
 
         @Info("Completes the mob modifier configuration and returns to the main settings builder")
