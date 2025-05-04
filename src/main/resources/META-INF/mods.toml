@@ -6,33 +6,47 @@ license = "All rights reserved" # https://choosealicense.com/
 # issueTrackerURL="https://github.com/invalid/pleasechangeme/issues"
 
 [[mods]]
-modId = "exampleaddon"
+modId = "pmmojs"
 version = "${version}"
-displayName = "Example Addon"
+displayName = "Pmmo JS"
 logoFile="icon.png"
 # credits="Thanks to FooterMan for the KubeJS Addon Template!"
 # authors="YourNameHere"
 description = '''
-Example KubeJS Addon.
+Bring Integration between Pmmo and KubeJS.
 '''
 
-[[dependencies.exampleaddon]]
+[[dependencies.pmmojs]]
 modId = "forge"
 mandatory = true
 versionRange = "[47,)"
 ordering = "NONE"
 side = "BOTH"
 
-[[dependencies.exampleaddon]]
+[[dependencies.pmmojs]]
 modId = "minecraft"
 mandatory = true
 versionRange = "[1.20.1,)"
 ordering = "NONE"
 side = "BOTH"
 
-[[dependencies.exampleaddon]]
+[[dependencies.pmmojs]]
 modId = "kubejs"
 mandatory = true
 versionRange = "[2001.6.4,)"
 ordering = "NONE"
 side = "BOTH"
+
+[[dependencies.pmmojs]]
+modId = "pmmo"
+mandatory = true
+versionRange = "[1.7.35,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.pmmojs]]
+modId = "yet_another_config_lib_v3"
+mandatory = false
+versionRange = "[3.2.2,)"
+ordering = "NONE"
+side = "CLIENT"

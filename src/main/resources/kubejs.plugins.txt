@@ -1,1 +1,1 @@
-com.example.exampleaddon.kubejs.ExampleKubeJSPlugin
+com.pickaid.pmmojs.kubejs.PMMOKubeJSPlugin
