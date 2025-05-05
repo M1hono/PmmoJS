@@ -1,8 +1,12 @@
 package com.pickaid.pmmojs.contents.settings;
 
+import com.pickaid.pmmojs.contents.settings.nbtbuilder.EntityNBTBuilder;
 import dev.latvian.mods.kubejs.typings.Info;
 import harmonised.pmmo.api.APIUtils;
+import harmonised.pmmo.api.enums.EventType;
+import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
+import harmonised.pmmo.api.enums.ReqType;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashMap;
@@ -23,9 +27,23 @@ public class EntitySettingsBuilder extends PMMOSettingsBuilder {
         return this;
     }
 
+    @Info("Creates a builder for NBT requirements for entities")
+    public EntityNBTBuilder nbtRequirement(ReqType reqType) {
+        return new EntityNBTBuilder(this, objectType, objectId, reqType, isOverride);
+    }
+
+    @Info("Creates a builder for NBT-based XP values for entities")
+    public EntityNBTBuilder nbtXp(EventType eventType) {
+        return new EntityNBTBuilder(this, objectType, objectId, eventType, isOverride);
+    }
+
+    @Info("Creates a builder for NBT-based bonuses for entities")
+    public EntityNBTBuilder nbtBonus(ModifierDataType modifierType) {
+        return new EntityNBTBuilder(this, objectType, objectId, modifierType, isOverride);
+    }
+
     @Info("Registers damage-specific XP awards")
     public EntitySettingsBuilder damageXp(boolean isDealt, String damageType, Map<String, ? extends Number> xpAwards) {
-        // Convert Number values to Long
         Map<String, Long> longXpAwards = new HashMap<>();
         for (Map.Entry<String, ? extends Number> entry : xpAwards.entrySet()) {
             longXpAwards.put(entry.getKey(), entry.getValue().longValue());

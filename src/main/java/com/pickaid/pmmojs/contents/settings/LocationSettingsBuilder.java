@@ -1,9 +1,12 @@
 package com.pickaid.pmmojs.contents.settings;
 
 import dev.latvian.mods.kubejs.typings.Info;
+import dev.latvian.mods.rhino.util.HideFromJS;
 import harmonised.pmmo.api.APIUtils;
+import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
+import harmonised.pmmo.api.enums.ReqType;
 import harmonised.pmmo.config.codecs.MobModifier;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;

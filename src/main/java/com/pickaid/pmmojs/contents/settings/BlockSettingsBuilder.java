@@ -1,8 +1,12 @@
 package com.pickaid.pmmojs.contents.settings;
 
+import com.pickaid.pmmojs.contents.settings.nbtbuilder.BlockNBTBuilder;
 import dev.latvian.mods.kubejs.typings.Info;
 import harmonised.pmmo.api.APIUtils;
+import harmonised.pmmo.api.enums.EventType;
+import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
+import harmonised.pmmo.api.enums.ReqType;
 import net.minecraft.resources.ResourceLocation;
 import java.util.Optional;
 
@@ -24,6 +28,21 @@ public class BlockSettingsBuilder extends PMMOSettingsBuilder {
     public BlockSettingsBuilder override(boolean override) {
         this.isOverride = override;
         return this;
+    }
+
+    @Info("Creates a builder for NBT requirements for blocks")
+    public BlockNBTBuilder nbtRequirement(ReqType reqType) {
+        return new BlockNBTBuilder(this, objectType, objectId, reqType, isOverride);
+    }
+
+    @Info("Creates a builder for NBT-based XP values for blocks")
+    public BlockNBTBuilder nbtXp(EventType eventType) {
+        return new BlockNBTBuilder(this, objectType, objectId, eventType, isOverride);
+    }
+
+    @Info("Creates a builder for NBT-based bonuses for blocks")
+    public BlockNBTBuilder nbtBonus(ModifierDataType modifierType) {
+        return new BlockNBTBuilder(this, objectType, objectId, modifierType, isOverride);
     }
 
     @Info("Sets the vein miner charge capacity")

@@ -1,11 +1,14 @@
 package com.pickaid.pmmojs.contents.settings;
 
+import com.pickaid.pmmojs.contents.settings.nbtbuilder.ItemNBTBuilder;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.latvian.mods.rhino.util.HideFromJS;
 import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.APIUtils.SalvageBuilder;
+import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
+import harmonised.pmmo.api.enums.ReqType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.item.Item;
@@ -24,6 +27,21 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
 
     public ItemSettingsBuilder(ObjectType objectType, ResourceLocation objectId) {
         super(objectType, objectId);
+    }
+
+    @Info("Creates a builder for NBT requirements for items")
+    public ItemNBTBuilder nbtRequirement(ReqType reqType) {
+        return new ItemNBTBuilder(this, objectType, objectId, reqType, isOverride);
+    }
+
+    @Info("Creates a builder for NBT-based XP values for items")
+    public ItemNBTBuilder nbtXp(EventType eventType) {
+        return new ItemNBTBuilder(this, objectType, objectId, eventType, isOverride);
+    }
+
+    @Info("Creates a builder for NBT-based bonuses for items")
+    public ItemNBTBuilder nbtBonus(ModifierDataType modifierType) {
+        return new ItemNBTBuilder(this, objectType, objectId, modifierType, isOverride);
     }
 
     @Info("""
@@ -61,6 +79,7 @@ public class ItemSettingsBuilder extends PMMOSettingsBuilder {
         return this;
     }
 
+    @HideFromJS
     private void registerVeinData() {
         Optional<Integer> intChargeCap = veinChargeCap.map(num -> num.intValue());
         Optional<Double> doubleChargeRate = veinChargeRate.map(num -> num.doubleValue());

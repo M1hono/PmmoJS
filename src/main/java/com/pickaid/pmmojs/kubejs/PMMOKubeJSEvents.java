@@ -1,6 +1,9 @@
 package com.pickaid.pmmojs.kubejs;
 
+import com.pickaid.pmmojs.kubejs.events.server.EnchantEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.FurnaceEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.PMMOSettingEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.XPEventJS;
 import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
 import com.pickaid.pmmojs.kubejs.events.startup.PredicateRegistryEventJS;
 import dev.latvian.mods.kubejs.event.EventGroup;
@@ -18,6 +21,9 @@ public interface PMMOKubeJSEvents {
     EventHandler REGISTER_PERK = GROUP.startup("registerPerk", () -> PerksRegistryEventJS.class);
 
     EventHandler SETTINGS = GROUP.server("settings", () -> PMMOSettingEventJS.class);
+    EventHandler ENCHANT = GROUP.server("enchant", () -> EnchantEventJS.class);
+    EventHandler FURNACE_BURN = GROUP.server("furnace", () -> FurnaceEventJS.class);
+    EventHandler XP = GROUP.server("xp", () -> XPEventJS.class).hasResult();
 
     static void registerPerk() {
         for (ResourceLocation perkId : PERKS.keySet()) {
