@@ -2,11 +2,8 @@ package com.pickaid.pmmojs;
 
 import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
 import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.SkillsEventJS;
 import dev.latvian.mods.rhino.util.HideFromJS;
-import harmonised.pmmo.config.SkillsConfig;
-import harmonised.pmmo.config.codecs.SkillData;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -25,6 +22,7 @@ public class PmmoJS {
     public static final Logger LOGGER = LogManager.getLogger();
 
     public PmmoJS () {
+        PMMOKubeJSEvents.SKILL_CONFIG.post(new SkillsEventJS());
         FMLJavaModLoadingContext ctx = FMLJavaModLoadingContext.get();
         IEventBus modEventBus = ctx.getModEventBus();
         modEventBus.addListener(this::setUp);

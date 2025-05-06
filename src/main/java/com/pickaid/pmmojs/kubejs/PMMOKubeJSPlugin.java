@@ -5,6 +5,11 @@ import com.pickaid.pmmojs.utils.CustomReqHelper;
 import com.pickaid.pmmojs.utils.SkillHelper;
 import dev.latvian.mods.kubejs.KubeJSPlugin;
 import dev.latvian.mods.kubejs.script.BindingsEvent;
+import harmonised.pmmo.api.enums.EventType;
+import harmonised.pmmo.api.enums.ModifierDataType;
+import harmonised.pmmo.api.enums.ObjectType;
+import harmonised.pmmo.api.enums.ReqType;
+import harmonised.pmmo.util.TagBuilder;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashMap;
@@ -22,6 +27,13 @@ public class PMMOKubeJSPlugin extends KubeJSPlugin {
     public void registerBindings(BindingsEvent event) {
         event.add("CustomReqMap", CustomReqHelper.class);
         event.add("SKillHelper", SkillHelper.class);
+        event.add("TagBuilder", TagBuilder.class);
+
+        // Common used Enums.
+        event.add("EventType", EventType.class);
+        event.add("ModifierDataType", ModifierDataType.class);
+        event.add("ObjectType", ObjectType.class);
+        event.add("ReqType", ReqType.class);
     }
 }
 

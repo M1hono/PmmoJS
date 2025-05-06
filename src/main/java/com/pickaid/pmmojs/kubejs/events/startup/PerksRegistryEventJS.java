@@ -7,9 +7,6 @@ import dev.latvian.mods.rhino.util.HideFromJS;
 import harmonised.pmmo.api.perks.Perk;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import static com.pickaid.pmmojs.kubejs.PMMOKubeJSPlugin.PERKS;
 
 public class PerksRegistryEventJS extends StartupEventJS {

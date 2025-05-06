@@ -43,4 +43,9 @@ public class XPEventJS extends PlayerEventJS {
     public Player getEntity() {
         return this.event.getEntity();
     }
+
+    @Info("the skill gained or lost experience in")
+    public String getSkill () {
+        return this.event.skill;
+    }
 }
