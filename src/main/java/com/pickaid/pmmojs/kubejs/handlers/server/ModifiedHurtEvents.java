@@ -35,14 +35,14 @@ public class ModifiedHurtEvents {
                 if (target.equals(player)) {
                     return;
                 }
-
+                var originalDamage = event.getAmount();
                 Core core = Core.get(player.level());
                 MsLoggy.INFO.log(MsLoggy.LOG_CODE.EVENT, "Attack Type: " + EventType.DEAL_DAMAGE.name() + " | TargetType: " + target.getType().toString(), new Object[0]);
                 if (!core.isActionPermitted(ReqType.WEAPON, player.getMainHandItem(), player)) {
                     ItemStackDamagePenaltyEvent itemStackDamagePenaltyEvent = new ItemStackDamagePenaltyEvent(event.getAmount(), player, player.getMainHandItem());
                     MinecraftForge.EVENT_BUS.post(itemStackDamagePenaltyEvent);
                     var itemStackDamagePenaltyEventJS = PMMOKubeJSEvents.ITEMSTACK_DAMAGE_PENALTY.post(new ItemStackDamagePenaltyEventJS(itemStackDamagePenaltyEvent));
-                    if (itemStackDamagePenaltyEvent.isCanceled() || itemStackDamagePenaltyEventJS.interruptFalse()) {
+                    if (!itemStackDamagePenaltyEvent.isCanceled() || !itemStackDamagePenaltyEventJS.interruptFalse() || originalDamage == itemStackDamagePenaltyEvent.getDamage()) {
                         event.setCanceled(true);
                     }
                     event.setAmount(itemStackDamagePenaltyEvent.getDamage());
@@ -53,7 +53,7 @@ public class ModifiedHurtEvents {
                 if (!core.isActionPermitted(ReqType.KILL, target, player)) {
                     EntityDamagePenaltyEvent entityDamagePenaltyEvent = new EntityDamagePenaltyEvent(event.getAmount(), player, target);
                     var entityDamagePenaltyEventJS = PMMOKubeJSEvents.ENTITY_DAMAGE_PENALTY.post(new EntityDamagePenaltyEventJS(entityDamagePenaltyEvent));
-                    if (entityDamagePenaltyEvent.isCanceled() || entityDamagePenaltyEventJS.interruptFalse()) {
+                    if (!entityDamagePenaltyEvent.isCanceled() || !entityDamagePenaltyEventJS.interruptFalse() || originalDamage == entityDamagePenaltyEvent.getDamage()) {
                         event.setCanceled(true);
                     }
                     event.setAmount(entityDamagePenaltyEvent.getDamage());
