@@ -1,18 +1,9 @@
-package com.pickaid.pmmojs.kubejs.events.server;
+package com.pickaid.pmmojs.kubejs.events.server.api;
 
 import dev.latvian.mods.kubejs.player.PlayerEventJS;
 import dev.latvian.mods.rhino.util.HideFromJS;
 import harmonised.pmmo.api.events.SalvageEvent;
-import harmonised.pmmo.core.Core;
-import harmonised.pmmo.features.party.PartyUtils;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class SalvageEventJS extends PlayerEventJS {
     SalvageEvent event;

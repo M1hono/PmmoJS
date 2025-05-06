@@ -1,10 +1,8 @@
-package com.pickaid.pmmojs.kubejs.events.server;
+package com.pickaid.pmmojs.kubejs.events.server.confg;
 
 import dev.latvian.mods.kubejs.event.EventJS;
 import dev.latvian.mods.kubejs.typings.Info;
-import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ReqType;
-import harmonised.pmmo.config.Config;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 

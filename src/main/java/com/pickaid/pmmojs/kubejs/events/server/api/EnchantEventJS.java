@@ -1,4 +1,4 @@
-package com.pickaid.pmmojs.kubejs.events.server;
+package com.pickaid.pmmojs.kubejs.events.server.api;
 
 import dev.latvian.mods.kubejs.player.PlayerEventJS;
 import dev.latvian.mods.rhino.util.HideFromJS;

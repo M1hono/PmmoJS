@@ -1,4 +1,4 @@
-package com.pickaid.pmmojs.kubejs.events.server;
+package com.pickaid.pmmojs.kubejs.events.server.api;
 
 import dev.latvian.mods.kubejs.event.EventJS;
 import dev.latvian.mods.kubejs.typings.Info;

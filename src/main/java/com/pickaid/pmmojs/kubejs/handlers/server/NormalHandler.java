@@ -1,9 +1,9 @@
 package com.pickaid.pmmojs.kubejs.handlers.server;
 
 import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
-import com.pickaid.pmmojs.kubejs.events.server.EnchantEventJS;
-import com.pickaid.pmmojs.kubejs.events.server.FurnaceEventJS;
-import com.pickaid.pmmojs.kubejs.events.server.XPEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.api.EnchantEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.api.FurnaceEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.api.XPEventJS;
 import harmonised.pmmo.api.events.EnchantEvent;
 import harmonised.pmmo.api.events.FurnaceBurnEvent;
 import harmonised.pmmo.api.events.XpEvent;

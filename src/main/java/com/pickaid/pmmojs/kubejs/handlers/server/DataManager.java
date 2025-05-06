@@ -3,16 +3,20 @@ package com.pickaid.pmmojs.kubejs.handlers.server;
 import com.pickaid.pmmojs.PmmoJS;
 import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
 import com.pickaid.pmmojs.kubejs.events.server.*;
+import com.pickaid.pmmojs.kubejs.events.server.confg.*;
 import com.pickaid.pmmojs.mixin.AutoValueConfigAccessor;
 import dev.latvian.mods.kubejs.util.ConsoleJS;
 import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ReqType;
 import harmonised.pmmo.api.events.PMMORegistrationEvent;
 import harmonised.pmmo.config.Config;
+import harmonised.pmmo.config.GlobalsConfig;
 import harmonised.pmmo.config.PerksConfig;
 import harmonised.pmmo.config.SkillsConfig;
 import harmonised.pmmo.config.codecs.SkillData;
 import harmonised.pmmo.config.readers.TomlConfigHelper;
+import harmonised.pmmo.features.anticheese.AntiCheeseConfig;
+import harmonised.pmmo.features.anticheese.CheeseTracker;
 import harmonised.pmmo.features.autovalues.AutoValueConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -52,10 +56,12 @@ public class DataManager {
 
     public static void updateConfigs() {
         if (!loaded) return;
+        updateGlobalsConfig();
         updateSkillsConfig();
         updatePerksConfig();
         updateServerConfig();
         updateAutoValuesConfig();
+        updateAntiCheeseConfig();
     }
 
     private static void updateSkillsConfig() {
@@ -144,7 +150,6 @@ public class DataManager {
 
     private static void updateServerConfig() {
         PMMOKubeJSEvents.SERVER_CONFIG.post(new ServerConfigEventJS());
-        // General settings
         if (ServerConfigEventJS.creativeReach != null) {
             Config.CREATIVE_REACH.set(ServerConfigEventJS.creativeReach);
         }
@@ -161,7 +166,6 @@ public class DataManager {
             Config.BREWING_TRACKED.set(ServerConfigEventJS.brewingTracked);
         }
 
-        // Level settings
         if (ServerConfigEventJS.maxLevel != null) {
             Config.MAX_LEVEL.set(ServerConfigEventJS.maxLevel);
         }
@@ -191,7 +195,6 @@ public class DataManager {
             skillMods.putAll(ServerConfigEventJS.skillModifiers);
         }
 
-        // Linear level settings
         if (ServerConfigEventJS.linearBaseXp != null) {
             Config.LINEAR_BASE_XP.set(ServerConfigEventJS.linearBaseXp);
         }
@@ -200,7 +203,6 @@ public class DataManager {
             Config.LINEAR_PER_LEVEL.set(ServerConfigEventJS.linearPerLevel);
         }
 
-        // Exponential level settings
         if (ServerConfigEventJS.exponentialBaseXp != null) {
             Config.EXPONENTIAL_BASE_XP.set(ServerConfigEventJS.exponentialBaseXp);
         }
@@ -213,12 +215,10 @@ public class DataManager {
             Config.EXPONENTIAL_LEVEL_MOD.set(ServerConfigEventJS.exponentialLevelMod);
         }
 
-        // Requirement settings
         for (Map.Entry<ReqType, Boolean> entry : ServerConfigEventJS.reqEnabled.entrySet()) {
             Config.reqEnabled(entry.getKey()).set(entry.getValue());
         }
 
-        // XP Gain settings
         if (ServerConfigEventJS.reusePenalty != null) {
             Config.REUSE_PENALTY.set(ServerConfigEventJS.reusePenalty);
         }
@@ -227,7 +227,6 @@ public class DataManager {
             Config.SUMMATED_MAPS.set(ServerConfigEventJS.summatedMaps);
         }
 
-        // Damage XP settings
         if (!ServerConfigEventJS.dealDamageXp.isEmpty()) {
             Map<String, Map<String, Long>> dealDamageXp = Config.DEAL_DAMAGE_XP.get();
             for (Map.Entry<String, Map<String, Long>> entry : ServerConfigEventJS.dealDamageXp.entrySet()) {
@@ -242,7 +241,6 @@ public class DataManager {
             }
         }
 
-        // Movement XP settings
         if (!ServerConfigEventJS.jumpXp.isEmpty()) {
             Map<String, Double> jumpXp = Config.JUMP_XP.get();
             jumpXp.putAll(ServerConfigEventJS.jumpXp);
@@ -258,7 +256,6 @@ public class DataManager {
             crouchJumpXp.putAll(ServerConfigEventJS.crouchJumpXp);
         }
 
-        // Player action XP settings
         if (!ServerConfigEventJS.breathChangeXp.isEmpty()) {
             Map<String, Double> breathChangeXp = Config.BREATH_CHANGE_XP.get();
             breathChangeXp.putAll(ServerConfigEventJS.breathChangeXp);
@@ -309,7 +306,6 @@ public class DataManager {
             swimSprintingXp.putAll(ServerConfigEventJS.swimSprintingXp);
         }
 
-        // Party settings
         if (ServerConfigEventJS.partyRange != null) {
             Config.PARTY_RANGE.set(ServerConfigEventJS.partyRange);
         }
@@ -319,7 +315,6 @@ public class DataManager {
             partyBonus.putAll(ServerConfigEventJS.partyBonus);
         }
 
-        // Mob scaling settings
         if (ServerConfigEventJS.mobScalingEnabled != null) {
             Config.MOB_SCALING_ENABLED.set(ServerConfigEventJS.mobScalingEnabled);
         }
@@ -359,7 +354,6 @@ public class DataManager {
             }
         }
 
-        // Vein miner settings
         if (ServerConfigEventJS.veinEnabled != null) {
             Config.VEIN_ENABLED.set(ServerConfigEventJS.veinEnabled);
         }
@@ -392,8 +386,6 @@ public class DataManager {
     }
     private static void updateAutoValuesConfig() {
         PMMOKubeJSEvents.AUTO_VALUE_CONFIG.post(new AutoValueEventJS());
-
-        // Update Item XP Awards
         Map<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> itemXpAwards = AutoValueConfigAccessor.getItemXpAwards();
         for (Map.Entry<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entry : itemXpAwards.entrySet()) {
             EventType eventType = entry.getKey();
@@ -418,7 +410,6 @@ public class DataManager {
             }
         }
 
-        // Update Block XP Awards
         Map<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> blockXpAwards = AutoValueConfigAccessor.getBlockXpAwards();
         for (Map.Entry<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entry : blockXpAwards.entrySet()) {
             EventType eventType = entry.getKey();
@@ -443,7 +434,6 @@ public class DataManager {
             }
         }
 
-        // Update Entity XP Awards
         Map<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entityXpAwards = AutoValueConfigAccessor.getEntityXpAwards();
         for (Map.Entry<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entry : entityXpAwards.entrySet()) {
             EventType eventType = entry.getKey();
@@ -468,7 +458,6 @@ public class DataManager {
             }
         }
 
-        // Special Overrides (these are already public)
         if (AutoValueEventJS.customAxeOverride != null) {
             Map<String, Long> axeValues = AutoValueConfig.AXE_OVERRIDE.get();
             if (axeValues instanceof HashMap) {
@@ -544,7 +533,6 @@ public class DataManager {
             }
         }
 
-        // Update Item Requirements
         Map<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> itemReqs = AutoValueConfigAccessor.getItemReqs();
         for (Map.Entry<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> entry : itemReqs.entrySet()) {
             ReqType reqType = entry.getKey();
@@ -569,7 +557,6 @@ public class DataManager {
             }
         }
 
-        // Update Block Requirements
         Map<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> blockReqs = AutoValueConfigAccessor.getBlockReqs();
         for (Map.Entry<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> entry : blockReqs.entrySet()) {
             ReqType reqType = entry.getKey();
@@ -594,7 +581,6 @@ public class DataManager {
             }
         }
 
-        // Update Tool Overrides
         if (AutoValueEventJS.customAxeToolOverride != null) {
             Map<String, Integer> axeValues = AutoValueConfigAccessor.getAxeToolOverride().get();
             if (axeValues instanceof HashMap) {
@@ -655,7 +641,6 @@ public class DataManager {
             }
         }
 
-        // Update Item Penalties (already public)
         if (AutoValueEventJS.customItemPenalties != null) {
             Map<ResourceLocation, Integer> penalties = AutoValueConfig.ITEM_PENALTIES.get();
             if (penalties instanceof HashMap) {
@@ -671,7 +656,6 @@ public class DataManager {
             }
         }
 
-        // Update Attribute Configuration
         Map<AutoValueConfig.UtensilTypes, TomlConfigHelper.ConfigObject<Map<String, Double>>> utensilAttributes = AutoValueConfigAccessor.getUtensilAttributes();
         for (Map.Entry<AutoValueConfig.UtensilTypes, TomlConfigHelper.ConfigObject<Map<String, Double>>> entry : utensilAttributes.entrySet()) {
             AutoValueConfig.UtensilTypes utensilType = entry.getKey();
@@ -712,7 +696,6 @@ public class DataManager {
             }
         }
 
-        // Update Entity Attributes (already public)
         if (AutoValueEventJS.customEntityAttributes != null) {
             Map<String, Double> entityAttrs = AutoValueConfig.ENTITY_ATTRIBUTES.get();
             if (entityAttrs instanceof HashMap) {
@@ -728,7 +711,6 @@ public class DataManager {
             }
         }
 
-        // Update global modifiers (already public)
         if (AutoValueEventJS.customRaritiesModifier != null) {
             AutoValueConfig.RARITIES_MODIFIER.set(AutoValueEventJS.customRaritiesModifier);
         }
@@ -739,6 +721,118 @@ public class DataManager {
 
         if (AutoValueEventJS.autoValuesEnabled != null) {
             AutoValueConfig.ENABLE_AUTO_VALUES.set(AutoValueEventJS.autoValuesEnabled);
+        }
+    }
+
+    private static void updateGlobalsConfig() {
+        PMMOKubeJSEvents.GLOBALS_CONFIG.post(new GlobalsEventJS());
+
+        Map<String, String> paths = GlobalsConfig.PATHS.get();
+        for (String key : GlobalsEventJS.removedPaths.keySet()) {
+            paths.remove(key);
+        }
+        if (!GlobalsEventJS.customPaths.isEmpty()) {
+            if (paths instanceof HashMap) {
+                paths.putAll(GlobalsEventJS.customPaths);
+            } else {
+                Map<String, String> newValues = new HashMap<>(paths);
+                newValues.putAll(GlobalsEventJS.customPaths);
+                if (GlobalsConfig.PATHS instanceof Map<?,?> map) {
+                    map.clear();
+                    Map<String, String> finalMap = (Map<String, String>) map;
+                    finalMap.putAll(newValues);
+                }
+            }
+        }
+
+        Map<String, String> constants = GlobalsConfig.CONSTANTS.get();
+        for (String key : GlobalsEventJS.removedConstants.keySet()) {
+            constants.remove(key);
+        }
+
+        if (!GlobalsEventJS.customConstants.isEmpty()) {
+            if (constants instanceof HashMap) {
+                constants.putAll(GlobalsEventJS.customConstants);
+            } else {
+                Map<String, String> newValues = new HashMap<>(constants);
+                newValues.putAll(GlobalsEventJS.customConstants);
+                if (GlobalsConfig.CONSTANTS instanceof Map<?,?> map) {
+                    map.clear();
+                    Map<String, String> finalMap = (Map<String, String>) map;
+                    finalMap.putAll(newValues);
+                }
+            }
+        }
+    }
+
+    private static void updateAntiCheeseConfig() {
+        PMMOKubeJSEvents.ANTI_CHEESE_CONFIG.post(new AntiCheeseEventJS());
+
+        if (AntiCheeseEventJS.afkCanSubtract != null) {
+            AntiCheeseConfig.AFK_CAN_SUBTRACT.set(AntiCheeseEventJS.afkCanSubtract);
+        }
+
+        Map<EventType, CheeseTracker.Setting> afkSettings = AntiCheeseConfig.SETTINGS_AFK.get();
+        for (EventType eventType : AntiCheeseEventJS.removedAfkSettings.keySet()) {
+            if (AntiCheeseEventJS.removedAfkSettings.get(eventType)) {
+                afkSettings.remove(eventType);
+            }
+        }
+
+        if (!AntiCheeseEventJS.customAfkSettings.isEmpty()) {
+            if (afkSettings instanceof HashMap) {
+                afkSettings.putAll(AntiCheeseEventJS.customAfkSettings);
+            } else {
+                Map<EventType, CheeseTracker.Setting> newValues = new HashMap<>(afkSettings);
+                newValues.putAll(AntiCheeseEventJS.customAfkSettings);
+                if (AntiCheeseConfig.SETTINGS_AFK instanceof Map<?,?> map) {
+                    map.clear();
+                    Map<EventType, CheeseTracker.Setting> finalMap = (Map<EventType, CheeseTracker.Setting>) map;
+                    finalMap.putAll(newValues);
+                }
+            }
+        }
+
+        Map<EventType, CheeseTracker.Setting> diminishingSettings = AntiCheeseConfig.SETTINGS_DIMINISHING.get();
+        for (EventType eventType : AntiCheeseEventJS.removedDiminishingSettings.keySet()) {
+            if (AntiCheeseEventJS.removedDiminishingSettings.get(eventType)) {
+                diminishingSettings.remove(eventType);
+            }
+        }
+
+        if (!AntiCheeseEventJS.customDiminishingSettings.isEmpty()) {
+            if (diminishingSettings instanceof HashMap) {
+                diminishingSettings.putAll(AntiCheeseEventJS.customDiminishingSettings);
+            } else {
+                Map<EventType, CheeseTracker.Setting> newValues = new HashMap<>(diminishingSettings);
+                newValues.putAll(AntiCheeseEventJS.customDiminishingSettings);
+                if (AntiCheeseConfig.SETTINGS_DIMINISHING instanceof Map<?,?> map) {
+                    map.clear();
+                    Map<EventType, CheeseTracker.Setting> finalMap = (Map<EventType, CheeseTracker.Setting>) map;
+                    finalMap.putAll(newValues);
+                }
+            }
+        }
+
+        Map<EventType, CheeseTracker.Setting> normalizationSettings = AntiCheeseConfig.SETTINGS_NORMALIZED.get();
+        for (EventType eventType : AntiCheeseEventJS.removedNormalizationSettings.keySet()) {
+            if (AntiCheeseEventJS.removedNormalizationSettings.get(eventType)) {
+                normalizationSettings.remove(eventType);
+            }
+        }
+
+        if (!AntiCheeseEventJS.customNormalizationSettings.isEmpty()) {
+            if (normalizationSettings instanceof HashMap) {
+                normalizationSettings.putAll(AntiCheeseEventJS.customNormalizationSettings);
+            } else {
+                Map<EventType, CheeseTracker.Setting> newValues = new HashMap<>(normalizationSettings);
+                newValues.putAll(AntiCheeseEventJS.customNormalizationSettings);
+                if (AntiCheeseConfig.SETTINGS_NORMALIZED instanceof Map<?,?> map) {
+                    map.clear();
+                    Map<EventType, CheeseTracker.Setting> finalMap = (Map<EventType, CheeseTracker.Setting>) map;
+                    finalMap.putAll(newValues);
+                }
+            }
         }
     }
 }

@@ -1,10 +1,9 @@
-package com.pickaid.pmmojs.kubejs.events.server;
+package com.pickaid.pmmojs.kubejs.events.server.api;
 
 import dev.latvian.mods.kubejs.player.PlayerEventJS;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.latvian.mods.rhino.util.HideFromJS;
 import harmonised.pmmo.api.events.XpEvent;
-import harmonised.pmmo.core.Core;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 
