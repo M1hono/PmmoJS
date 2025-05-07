@@ -85,12 +85,9 @@ public class ItemNBTBuilder {
 
     @Info("Creates a new case with the specified NBT path")
     public ItemNBTBuilder newCase(String nbtPath) {
-        // If we have an existing case with paths and criteria, save it
         if (!currentPaths.isEmpty() && !currentCriteria.isEmpty()) {
             saveCurrentCase();
         }
-
-        // Start a new case
         currentPaths = new ArrayList<>();
         currentCriteria = new ArrayList<>();
         currentPaths.add(nbtPath);

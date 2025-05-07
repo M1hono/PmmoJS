@@ -2,6 +2,7 @@ package com.pickaid.pmmojs.kubejs;
 
 import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
 import com.pickaid.pmmojs.utils.CustomReqHelper;
+import com.pickaid.pmmojs.utils.NbtPathBuilder;
 import com.pickaid.pmmojs.utils.SkillHelper;
 import dev.latvian.mods.kubejs.KubeJSPlugin;
 import dev.latvian.mods.kubejs.script.BindingsEvent;
@@ -28,6 +29,7 @@ public class PMMOKubeJSPlugin extends KubeJSPlugin {
         event.add("CustomReqMap", CustomReqHelper.class);
         event.add("SKillHelper", SkillHelper.class);
         event.add("TagBuilder", TagBuilder.class);
+        event.add("NbtPathBuilder", NbtPathBuilder.class);
 
         // Common used Enums.
         event.add("EventType", EventType.class);
