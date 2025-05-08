@@ -1,0 +1,157 @@
+---
+title: 设置管理
+hide_meta: true
+---
+
+# 设置事件
+
+本节介绍如何为物品、方块和实体配置技能需求与经验奖励
+
+## PMMO设置事件
+
+注册自定义PMMO设置和需求的主要事件：
+
+```js
+PmmoJS.settings((event) => {
+    // 创建物品设置
+    event
+        .item("minecraft:diamond_sword") // 钻石剑
+        .setRequirement("use", "combat", 10) // 使用需求：战斗技能10级
+        .setRequirement("wear", "combat", 15) // 穿戴需求：战斗技能15级
+        .setXpAward("craft", "smithing", 100) // 合成奖励：锻造技能100XP
+        .setXpAward("use", "combat", 5); // 使用奖励：战斗技能5XP
+
+    // 创建方块设置
+    event
+        .block("minecraft:diamond_ore") // 钻石矿
+        .setRequirement("break", "mining", 30) // 破坏需求：采矿技能30级
+        .setXpAward("break", "mining", 200); // 破坏奖励：采矿技能200XP
+
+    // 创建实体设置
+    event
+        .entity("minecraft:zombie") // 僵尸
+        .setXpAward("kill", "combat", 25) // 击杀奖励：战斗技能25XP
+        .setXpAward("damage", "ranged", 5); // 造成伤害奖励：远程技能5XP
+
+    // 创建生物群系/维度设置
+    event.biome("minecraft:plains").setXpAward("travel", "endurance", 1); // 平原群系移动奖励：耐力技能1XP
+
+    event
+        .dimension("minecraft:the_nether") // 下界维度
+        .setRequirement("travel", "endurance", 20) // 移动需求：耐力技能20级
+        .setXpAward("travel", "endurance", 5) // 移动奖励：耐力技能5XP
+        .setPositiveEffect("minecraft:fire_resistance", 0); // 自动赋予火焰抵抗效果
+
+    // 物品回收配置
+    event
+        .item("minecraft:diamond_pickaxe") // 钻石镐
+        .override(true) // 覆盖原版设置
+        .salvage("diamond") // 可回收钻石
+        .baseChance(0.7) // 基础概率70%
+        .and("stick") // 同时回收木棍
+        .baseChance(1.0) // 木棍基础概率100%
+        .done();
+
+    // 基于NBT的需求设置
+    event
+        .item("minecraft:diamond_sword") // 钻石剑
+        .nbtRequirement("use") // 使用时的NBT需求
+        .behavior("add_to") // 累计叠加模式
+        .path("Damage") // 监测Damage标签
+        .greaterThanOrEqual(20, "combat", 5) // 当Damage≥20时需求战斗5级
+        .done();
+
+    // 多技能需求配置
+    event.item("minecraft:golden_apple").requirement("use", { // 金苹果使用需求
+        endurance: 50, // 耐力50级
+        magic: 25, // 魔法25级
+    });
+
+    // 使用材料标签匹配
+    Ingredient.of("#forge:armors") // 匹配所有锻造标签的盔甲
+        .getItemIds()
+        .forEach((item) => {
+            event.item(item).setRequirement("wear", "defense", 10); // 穿戴需求：防御10级
+        });
+
+    // 重置原版设置
+    event.clearVanillaItemSettings(); // 清除所有原版物品设置
+    event.clearVanillaBlockSettings(); // 清除所有原版方块设置
+    event.clearVanillaEntitySettings(); // 清除所有原版实体设置
+});
+```
+
+## 伤害惩罚事件
+
+当玩家未满足需求时，可以修改伤害惩罚值：
+
+<Callout>
+    原版Project MMO通过直接取消事件来处理，现在可以通过此事件修改结果
+</Callout>
+
+### 物品伤害惩罚
+
+调整使用未满足需求物品时的惩罚：
+
+```js
+PmmoJS.itemDamagePenalty((event) => {
+    const player = event.getEntity(); // 获取玩家实体
+    const item = event.getItemStack(); // 获取物品堆栈
+    const currentDamage = event.getDamage(); // 当前惩罚伤害值
+
+    // 获取需求数据（false=不忽略附魔）
+    const reqData = event.getReqData(false); 
+
+    // 检查特定物品或类别
+    if (item.id == "minecraft:diamond_sword") { // 如果是钻石剑
+        event.setDamage(currentDamage * 0.75); // 减少25%惩罚
+    }
+
+    // 根据玩家接近需求程度调整惩罚
+    const combatReq = reqData.combat || 0; // 获取战斗需求等级
+    const playerLevel = player.getPMMOData().getLevel("combat"); // 玩家当前战斗等级
+    if (playerLevel > combatReq * 0.8) { // 达到需求等级的80%
+        event.setDamage(currentDamage * 0.5); // 惩罚减半
+    }
+});
+```
+
+### 实体伤害惩罚
+
+调整攻击未满足需求实体时的惩罚：
+
+```js
+PmmoJS.entityDamagePenalty((event) => {
+    const player = event.getEntity(); // 获取玩家
+    const target = event.getTarget(); // 获取目标实体
+    const currentDamage = event.getDamage(); // 当前惩罚伤害值
+
+    // 获取需求数据
+    const reqData = event.getReqData();
+
+    // 处理特定实体类型
+    if (target.type == "minecraft:ender_dragon") { // 末影龙特殊处理
+        event.setDamage(currentDamage * 0.5); // 伤害惩罚减半
+    }
+
+    // 根据玩家等级比例调整
+    const combatReq = reqData.combat || 0; // 战斗需求等级
+    const playerLevel = player.getPMMOData().getLevel("combat"); // 玩家当前等级
+    const ratio = playerLevel / combatReq; // 计算等级比例
+
+    if (ratio > 0.5) { // 达到需求等级的50%
+        event.setDamage(currentDamage * ratio); // 按比例调整伤害
+    }
+});
+```
+
+## 使用说明
+
+-   通过这些事件定义的设置会覆盖数据包中的值
+-   可以同时为多个技能设置需求
+-   单个操作可以触发多个技能的经验奖励
+-   惩罚事件在玩家未满足需求时触发，允许根据上下文自定义惩罚
+
+<Callout variant="warning">
+    调整惩罚事件中的伤害值时需谨慎，极端修改可能导致游戏平衡性问题
+</Callout>

@@ -17,6 +17,7 @@ buildscript {
 plugins {
     id "dev.architectury.loom" version "1.4-SNAPSHOT"
     id 'maven-publish'
+    id("org.moddedmc.wiki.toolkit") version "0.2.7"
 }
 
 apply plugin: 'idea'
@@ -39,6 +40,14 @@ configFile.withReader {
     project.ext.config = new ConfigSlurper().parse(prop)
     project.ext.hasConfig = { key ->
         return config.isSet(key)
+    }
+}
+
+wiki {
+    // The name of the object (examplemod) should match the registered wiki project ID (if it exists).
+    docs.create("pmmojs") {
+        // The path to the folder containing the documentation metadata file (sinytra-wiki.json)
+        root = file("docs/")
     }
 }
 

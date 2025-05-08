@@ -28,7 +28,7 @@ public interface PMMOKubeJSEvents {
     EventHandler GLOBALS_CONFIG = GROUP.server("globalsConfig", () -> GlobalsEventJS.class);
     EventHandler SKILL_CONFIG = GROUP.server("skillsConfig", () -> SkillsEventJS.class);
     EventHandler PERK_CONFIG = GROUP.server("perksConfig", () -> PerksEventJS.class);
-    EventHandler SERVER_CONFIG = GROUP.server("serverConfig", () -> ServerConfigEventJS.class);
+    EventHandler SERVER_CONFIG = GROUP.server("serverConfig", () -> ServerEventJS.class);
     EventHandler AUTO_VALUE_CONFIG = GROUP.server("autoValueConfig", () -> AutoValueEventJS.class);
     EventHandler ANTI_CHEESE_CONFIG = GROUP.server("antiCheeseConfig", () -> AntiCheeseEventJS.class);
 

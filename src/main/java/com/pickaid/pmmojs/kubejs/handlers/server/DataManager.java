@@ -149,239 +149,239 @@ public class DataManager {
     }
 
     private static void updateServerConfig() {
-        PMMOKubeJSEvents.SERVER_CONFIG.post(new ServerConfigEventJS());
-        if (ServerConfigEventJS.creativeReach != null) {
-            Config.CREATIVE_REACH.set(ServerConfigEventJS.creativeReach);
+        PMMOKubeJSEvents.SERVER_CONFIG.post(new ServerEventJS());
+        if (ServerEventJS.creativeReach != null) {
+            Config.CREATIVE_REACH.set(ServerEventJS.creativeReach);
         }
 
-        if (ServerConfigEventJS.salvageBlock != null) {
-            Config.SALVAGE_BLOCK.set(ServerConfigEventJS.salvageBlock);
+        if (ServerEventJS.salvageBlock != null) {
+            Config.SALVAGE_BLOCK.set(ServerEventJS.salvageBlock);
         }
 
-        if (ServerConfigEventJS.treasureEnabled != null) {
-            Config.TREASURE_ENABLED.set(ServerConfigEventJS.treasureEnabled);
+        if (ServerEventJS.treasureEnabled != null) {
+            Config.TREASURE_ENABLED.set(ServerEventJS.treasureEnabled);
         }
 
-        if (ServerConfigEventJS.brewingTracked != null) {
-            Config.BREWING_TRACKED.set(ServerConfigEventJS.brewingTracked);
+        if (ServerEventJS.brewingTracked != null) {
+            Config.BREWING_TRACKED.set(ServerEventJS.brewingTracked);
         }
 
-        if (ServerConfigEventJS.maxLevel != null) {
-            Config.MAX_LEVEL.set(ServerConfigEventJS.maxLevel);
+        if (ServerEventJS.maxLevel != null) {
+            Config.MAX_LEVEL.set(ServerEventJS.maxLevel);
         }
 
-        if (ServerConfigEventJS.lossOnDeath != null) {
-            Config.LOSS_ON_DEATH.set(ServerConfigEventJS.lossOnDeath);
+        if (ServerEventJS.lossOnDeath != null) {
+            Config.LOSS_ON_DEATH.set(ServerEventJS.lossOnDeath);
         }
 
-        if (ServerConfigEventJS.loseLevelsOnDeath != null) {
-            Config.LOSE_LEVELS_ON_DEATH.set(ServerConfigEventJS.loseLevelsOnDeath);
+        if (ServerEventJS.loseLevelsOnDeath != null) {
+            Config.LOSE_LEVELS_ON_DEATH.set(ServerEventJS.loseLevelsOnDeath);
         }
 
-        if (ServerConfigEventJS.loseOnlyExcess != null) {
-            Config.LOSE_ONLY_EXCESS.set(ServerConfigEventJS.loseOnlyExcess);
+        if (ServerEventJS.loseOnlyExcess != null) {
+            Config.LOSE_ONLY_EXCESS.set(ServerEventJS.loseOnlyExcess);
         }
 
-        if (ServerConfigEventJS.useExponentialFormula != null) {
-            Config.USE_EXPONENTIAL_FORMULA.set(ServerConfigEventJS.useExponentialFormula);
+        if (ServerEventJS.useExponentialFormula != null) {
+            Config.USE_EXPONENTIAL_FORMULA.set(ServerEventJS.useExponentialFormula);
         }
 
-        if (ServerConfigEventJS.globalModifier != null) {
-            Config.GLOBAL_MODIFIER.set(ServerConfigEventJS.globalModifier);
+        if (ServerEventJS.globalModifier != null) {
+            Config.GLOBAL_MODIFIER.set(ServerEventJS.globalModifier);
         }
 
-        if (!ServerConfigEventJS.skillModifiers.isEmpty()) {
+        if (!ServerEventJS.skillModifiers.isEmpty()) {
             Map<String, Double> skillMods = Config.SKILL_MODIFIERS.get();
-            skillMods.putAll(ServerConfigEventJS.skillModifiers);
+            skillMods.putAll(ServerEventJS.skillModifiers);
         }
 
-        if (ServerConfigEventJS.linearBaseXp != null) {
-            Config.LINEAR_BASE_XP.set(ServerConfigEventJS.linearBaseXp);
+        if (ServerEventJS.linearBaseXp != null) {
+            Config.LINEAR_BASE_XP.set(ServerEventJS.linearBaseXp);
         }
 
-        if (ServerConfigEventJS.linearPerLevel != null) {
-            Config.LINEAR_PER_LEVEL.set(ServerConfigEventJS.linearPerLevel);
+        if (ServerEventJS.linearPerLevel != null) {
+            Config.LINEAR_PER_LEVEL.set(ServerEventJS.linearPerLevel);
         }
 
-        if (ServerConfigEventJS.exponentialBaseXp != null) {
-            Config.EXPONENTIAL_BASE_XP.set(ServerConfigEventJS.exponentialBaseXp);
+        if (ServerEventJS.exponentialBaseXp != null) {
+            Config.EXPONENTIAL_BASE_XP.set(ServerEventJS.exponentialBaseXp);
         }
 
-        if (ServerConfigEventJS.exponentialPowerBase != null) {
-            Config.EXPONENTIAL_POWER_BASE.set(ServerConfigEventJS.exponentialPowerBase);
+        if (ServerEventJS.exponentialPowerBase != null) {
+            Config.EXPONENTIAL_POWER_BASE.set(ServerEventJS.exponentialPowerBase);
         }
 
-        if (ServerConfigEventJS.exponentialLevelMod != null) {
-            Config.EXPONENTIAL_LEVEL_MOD.set(ServerConfigEventJS.exponentialLevelMod);
+        if (ServerEventJS.exponentialLevelMod != null) {
+            Config.EXPONENTIAL_LEVEL_MOD.set(ServerEventJS.exponentialLevelMod);
         }
 
-        for (Map.Entry<ReqType, Boolean> entry : ServerConfigEventJS.reqEnabled.entrySet()) {
+        for (Map.Entry<ReqType, Boolean> entry : ServerEventJS.reqEnabled.entrySet()) {
             Config.reqEnabled(entry.getKey()).set(entry.getValue());
         }
 
-        if (ServerConfigEventJS.reusePenalty != null) {
-            Config.REUSE_PENALTY.set(ServerConfigEventJS.reusePenalty);
+        if (ServerEventJS.reusePenalty != null) {
+            Config.REUSE_PENALTY.set(ServerEventJS.reusePenalty);
         }
 
-        if (ServerConfigEventJS.summatedMaps != null) {
-            Config.SUMMATED_MAPS.set(ServerConfigEventJS.summatedMaps);
+        if (ServerEventJS.summatedMaps != null) {
+            Config.SUMMATED_MAPS.set(ServerEventJS.summatedMaps);
         }
 
-        if (!ServerConfigEventJS.dealDamageXp.isEmpty()) {
+        if (!ServerEventJS.dealDamageXp.isEmpty()) {
             Map<String, Map<String, Long>> dealDamageXp = Config.DEAL_DAMAGE_XP.get();
-            for (Map.Entry<String, Map<String, Long>> entry : ServerConfigEventJS.dealDamageXp.entrySet()) {
+            for (Map.Entry<String, Map<String, Long>> entry : ServerEventJS.dealDamageXp.entrySet()) {
                 dealDamageXp.computeIfAbsent(entry.getKey(), k -> new HashMap<>()).putAll(entry.getValue());
             }
         }
 
-        if (!ServerConfigEventJS.receiveDamageXp.isEmpty()) {
+        if (!ServerEventJS.receiveDamageXp.isEmpty()) {
             Map<String, Map<String, Long>> receiveDamageXp = Config.RECEIVE_DAMAGE_XP.get();
-            for (Map.Entry<String, Map<String, Long>> entry : ServerConfigEventJS.receiveDamageXp.entrySet()) {
+            for (Map.Entry<String, Map<String, Long>> entry : ServerEventJS.receiveDamageXp.entrySet()) {
                 receiveDamageXp.computeIfAbsent(entry.getKey(), k -> new HashMap<>()).putAll(entry.getValue());
             }
         }
 
-        if (!ServerConfigEventJS.jumpXp.isEmpty()) {
+        if (!ServerEventJS.jumpXp.isEmpty()) {
             Map<String, Double> jumpXp = Config.JUMP_XP.get();
-            jumpXp.putAll(ServerConfigEventJS.jumpXp);
+            jumpXp.putAll(ServerEventJS.jumpXp);
         }
 
-        if (!ServerConfigEventJS.sprintJumpXp.isEmpty()) {
+        if (!ServerEventJS.sprintJumpXp.isEmpty()) {
             Map<String, Double> sprintJumpXp = Config.SPRINT_JUMP_XP.get();
-            sprintJumpXp.putAll(ServerConfigEventJS.sprintJumpXp);
+            sprintJumpXp.putAll(ServerEventJS.sprintJumpXp);
         }
 
-        if (!ServerConfigEventJS.crouchJumpXp.isEmpty()) {
+        if (!ServerEventJS.crouchJumpXp.isEmpty()) {
             Map<String, Double> crouchJumpXp = Config.CROUCH_JUMP_XP.get();
-            crouchJumpXp.putAll(ServerConfigEventJS.crouchJumpXp);
+            crouchJumpXp.putAll(ServerEventJS.crouchJumpXp);
         }
 
-        if (!ServerConfigEventJS.breathChangeXp.isEmpty()) {
+        if (!ServerEventJS.breathChangeXp.isEmpty()) {
             Map<String, Double> breathChangeXp = Config.BREATH_CHANGE_XP.get();
-            breathChangeXp.putAll(ServerConfigEventJS.breathChangeXp);
+            breathChangeXp.putAll(ServerEventJS.breathChangeXp);
         }
 
-        if (!ServerConfigEventJS.healthChangeXp.isEmpty()) {
+        if (!ServerEventJS.healthChangeXp.isEmpty()) {
             Map<String, Double> healthChangeXp = Config.HEALTH_CHANGE_XP.get();
-            healthChangeXp.putAll(ServerConfigEventJS.healthChangeXp);
+            healthChangeXp.putAll(ServerEventJS.healthChangeXp);
         }
 
-        if (!ServerConfigEventJS.healthIncreaseXp.isEmpty()) {
+        if (!ServerEventJS.healthIncreaseXp.isEmpty()) {
             Map<String, Double> healthIncreaseXp = Config.HEALTH_INCREASE_XP.get();
-            healthIncreaseXp.putAll(ServerConfigEventJS.healthIncreaseXp);
+            healthIncreaseXp.putAll(ServerEventJS.healthIncreaseXp);
         }
 
-        if (!ServerConfigEventJS.healthDecreaseXp.isEmpty()) {
+        if (!ServerEventJS.healthDecreaseXp.isEmpty()) {
             Map<String, Double> healthDecreaseXp = Config.HEALTH_DECREASE_XP.get();
-            healthDecreaseXp.putAll(ServerConfigEventJS.healthDecreaseXp);
+            healthDecreaseXp.putAll(ServerEventJS.healthDecreaseXp);
         }
 
-        if (!ServerConfigEventJS.sprintingXp.isEmpty()) {
+        if (!ServerEventJS.sprintingXp.isEmpty()) {
             Map<String, Double> sprintingXp = Config.SPRINTING_XP.get();
-            sprintingXp.putAll(ServerConfigEventJS.sprintingXp);
+            sprintingXp.putAll(ServerEventJS.sprintingXp);
         }
 
-        if (!ServerConfigEventJS.submergedXp.isEmpty()) {
+        if (!ServerEventJS.submergedXp.isEmpty()) {
             Map<String, Double> submergedXp = Config.SUBMERGED_XP.get();
-            submergedXp.putAll(ServerConfigEventJS.submergedXp);
+            submergedXp.putAll(ServerEventJS.submergedXp);
         }
 
-        if (!ServerConfigEventJS.swimmingXp.isEmpty()) {
+        if (!ServerEventJS.swimmingXp.isEmpty()) {
             Map<String, Double> swimmingXp = Config.SWIMMING_XP.get();
-            swimmingXp.putAll(ServerConfigEventJS.swimmingXp);
+            swimmingXp.putAll(ServerEventJS.swimmingXp);
         }
 
-        if (!ServerConfigEventJS.divingXp.isEmpty()) {
+        if (!ServerEventJS.divingXp.isEmpty()) {
             Map<String, Double> divingXp = Config.DIVING_XP.get();
-            divingXp.putAll(ServerConfigEventJS.divingXp);
+            divingXp.putAll(ServerEventJS.divingXp);
         }
 
-        if (!ServerConfigEventJS.surfacingXp.isEmpty()) {
+        if (!ServerEventJS.surfacingXp.isEmpty()) {
             Map<String, Double> surfacingXp = Config.SURFACING_XP.get();
-            surfacingXp.putAll(ServerConfigEventJS.surfacingXp);
+            surfacingXp.putAll(ServerEventJS.surfacingXp);
         }
 
-        if (!ServerConfigEventJS.swimSprintingXp.isEmpty()) {
+        if (!ServerEventJS.swimSprintingXp.isEmpty()) {
             Map<String, Double> swimSprintingXp = Config.SWIM_SPRINTING_XP.get();
-            swimSprintingXp.putAll(ServerConfigEventJS.swimSprintingXp);
+            swimSprintingXp.putAll(ServerEventJS.swimSprintingXp);
         }
 
-        if (ServerConfigEventJS.partyRange != null) {
-            Config.PARTY_RANGE.set(ServerConfigEventJS.partyRange);
+        if (ServerEventJS.partyRange != null) {
+            Config.PARTY_RANGE.set(ServerEventJS.partyRange);
         }
 
-        if (!ServerConfigEventJS.partyBonus.isEmpty()) {
+        if (!ServerEventJS.partyBonus.isEmpty()) {
             Map<String, Double> partyBonus = Config.PARTY_BONUS.get();
-            partyBonus.putAll(ServerConfigEventJS.partyBonus);
+            partyBonus.putAll(ServerEventJS.partyBonus);
         }
 
-        if (ServerConfigEventJS.mobScalingEnabled != null) {
-            Config.MOB_SCALING_ENABLED.set(ServerConfigEventJS.mobScalingEnabled);
+        if (ServerEventJS.mobScalingEnabled != null) {
+            Config.MOB_SCALING_ENABLED.set(ServerEventJS.mobScalingEnabled);
         }
 
-        if (ServerConfigEventJS.mobUseExponentialFormula != null) {
-            Config.MOB_USE_EXPONENTIAL_FORMULA.set(ServerConfigEventJS.mobUseExponentialFormula);
+        if (ServerEventJS.mobUseExponentialFormula != null) {
+            Config.MOB_USE_EXPONENTIAL_FORMULA.set(ServerEventJS.mobUseExponentialFormula);
         }
 
-        if (ServerConfigEventJS.mobScalingAoe != null) {
-            Config.MOB_SCALING_AOE.set(ServerConfigEventJS.mobScalingAoe);
+        if (ServerEventJS.mobScalingAoe != null) {
+            Config.MOB_SCALING_AOE.set(ServerEventJS.mobScalingAoe);
         }
 
-        if (ServerConfigEventJS.mobScalingBaseLevel != null) {
-            Config.MOB_SCALING_BASE_LEVEL.set(ServerConfigEventJS.mobScalingBaseLevel);
+        if (ServerEventJS.mobScalingBaseLevel != null) {
+            Config.MOB_SCALING_BASE_LEVEL.set(ServerEventJS.mobScalingBaseLevel);
         }
 
-        if (ServerConfigEventJS.mobLinearPerLevel != null) {
-            Config.MOB_LINEAR_PER_LEVEL.set(ServerConfigEventJS.mobLinearPerLevel);
+        if (ServerEventJS.mobLinearPerLevel != null) {
+            Config.MOB_LINEAR_PER_LEVEL.set(ServerEventJS.mobLinearPerLevel);
         }
 
-        if (ServerConfigEventJS.mobExponentialPowerBase != null) {
-            Config.MOB_EXPONENTIAL_POWER_BASE.set(ServerConfigEventJS.mobExponentialPowerBase);
+        if (ServerEventJS.mobExponentialPowerBase != null) {
+            Config.MOB_EXPONENTIAL_POWER_BASE.set(ServerEventJS.mobExponentialPowerBase);
         }
 
-        if (ServerConfigEventJS.mobExponentialLevelMod != null) {
-            Config.MOB_EXPONENTIAL_LEVEL_MOD.set(ServerConfigEventJS.mobExponentialLevelMod);
+        if (ServerEventJS.mobExponentialLevelMod != null) {
+            Config.MOB_EXPONENTIAL_LEVEL_MOD.set(ServerEventJS.mobExponentialLevelMod);
         }
 
-        if (ServerConfigEventJS.bossScalingRatio != null) {
-            Config.BOSS_SCALING_RATIO.set(ServerConfigEventJS.bossScalingRatio);
+        if (ServerEventJS.bossScalingRatio != null) {
+            Config.BOSS_SCALING_RATIO.set(ServerEventJS.bossScalingRatio);
         }
 
-        if (!ServerConfigEventJS.mobScaling.isEmpty()) {
+        if (!ServerEventJS.mobScaling.isEmpty()) {
             Map<ResourceLocation, Map<String, Double>> mobScaling = Config.MOB_SCALING.get();
-            for (Map.Entry<ResourceLocation, Map<String, Double>> entry : ServerConfigEventJS.mobScaling.entrySet()) {
+            for (Map.Entry<ResourceLocation, Map<String, Double>> entry : ServerEventJS.mobScaling.entrySet()) {
                 mobScaling.computeIfAbsent(entry.getKey(), k -> new HashMap<>()).putAll(entry.getValue());
             }
         }
 
-        if (ServerConfigEventJS.veinEnabled != null) {
-            Config.VEIN_ENABLED.set(ServerConfigEventJS.veinEnabled);
+        if (ServerEventJS.veinEnabled != null) {
+            Config.VEIN_ENABLED.set(ServerEventJS.veinEnabled);
         }
 
-        if (ServerConfigEventJS.requireSetting != null) {
-            Config.REQUIRE_SETTING.set(ServerConfigEventJS.requireSetting);
+        if (ServerEventJS.requireSetting != null) {
+            Config.REQUIRE_SETTING.set(ServerEventJS.requireSetting);
         }
 
-        if (ServerConfigEventJS.defaultConsume != null) {
-            Config.DEFAULT_CONSUME.set(ServerConfigEventJS.defaultConsume);
+        if (ServerEventJS.defaultConsume != null) {
+            Config.DEFAULT_CONSUME.set(ServerEventJS.defaultConsume);
         }
 
-        if (ServerConfigEventJS.veinChargeModifier != null) {
-            Config.VEIN_CHARGE_MODIFIER.set(ServerConfigEventJS.veinChargeModifier);
+        if (ServerEventJS.veinChargeModifier != null) {
+            Config.VEIN_CHARGE_MODIFIER.set(ServerEventJS.veinChargeModifier);
         }
 
-        if (!ServerConfigEventJS.veinBlacklist.isEmpty()) {
+        if (!ServerEventJS.veinBlacklist.isEmpty()) {
             List<String> veinBlacklist = new ArrayList<>(Config.VEIN_BLACKLIST.get());
-            veinBlacklist.addAll(ServerConfigEventJS.veinBlacklist);
+            veinBlacklist.addAll(ServerEventJS.veinBlacklist);
             Config.VEIN_BLACKLIST.set(veinBlacklist);
         }
 
-        if (ServerConfigEventJS.baseChargeRate != null) {
-            Config.BASE_CHARGE_RATE.set(ServerConfigEventJS.baseChargeRate);
+        if (ServerEventJS.baseChargeRate != null) {
+            Config.BASE_CHARGE_RATE.set(ServerEventJS.baseChargeRate);
         }
 
-        if (ServerConfigEventJS.baseChargeCap != null) {
-            Config.BASE_CHARGE_CAP.set(ServerConfigEventJS.baseChargeCap);
+        if (ServerEventJS.baseChargeCap != null) {
+            Config.BASE_CHARGE_CAP.set(ServerEventJS.baseChargeCap);
         }
     }
     private static void updateAutoValuesConfig() {

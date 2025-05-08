@@ -1,0 +1,140 @@
+---
+title: 功能事件
+hide_meta: true
+---
+
+# 服务器事件
+
+本节介绍在游戏过程中触发的功能性服务器事件
+
+## 经验事件
+
+当玩家在某个技能中获得或失去经验时触发：
+
+```js
+PmmoJS.xp((event) => {
+    const player = event.getEntity(); // 获取玩家实体
+    const skill = event.getSkill(); // 获取当前技能
+    const startLevel = event.startLevel(); // 获取升级前等级
+    const endLevel = event.endLevel(); // 获取升级后等级
+    const isLevelUp = event.isLevelUp(); // 判断是否是升级
+    const context = event.getContext(); // 获取事件上下文
+
+    if (isLevelUp) { // 如果是升级事件
+        // 每升10级奖励钻石
+        if (endLevel % 10 === 0) {
+            player.give(Item.of("minecraft:diamond", 1));
+        }
+
+        // 魔法技能达到50级时奖励附魔书
+        if (skill === "magic" && endLevel === 50) {
+            player.give(Item.of("minecraft:enchanted_book"));
+        }
+    }
+
+    // 禁止采矿技能的经验获取
+    if (skill === "mining") {
+        event.cancel();
+    }
+
+    // 获取经验来源信息（如果有）
+    if (context.contains("source")) {
+        const source = context.getString("source");
+    }
+});
+```
+
+## 附魔事件
+
+当玩家给物品附魔时触发：
+
+```js
+PmmoJS.enchant((event) => {
+    const player = event.getEntity(); // 附魔的玩家
+    const enchantment = event.getEnchantmentInstance(); // 附魔实例
+    const stack = event.getStack(); // 被附魔的物品
+
+    // 仅处理3级及以上的附魔
+    if (enchantment.level >= 3) {
+        // 获取纯净的附魔名称（去除命名空间前缀）
+        const enchantName = enchantment.enchantment
+            .getDescriptionId()
+            .replace("enchantment.minecraft.", "");
+
+        // 根据附魔类型分配不同技能的经验
+        if (enchantName === "sharpness" || enchantName === "power") { // 锋利/力量
+            SKillHelper.addXP(player, "combat", 50 * enchantment.level) // 战斗技能
+        } else if (enchantName === "efficiency" || enchantName === "fortune") { // 效率/时运
+            SKillHelper.addXP(player, "mining", 50 * enchantment.level) // 采矿技能
+        } else { // 其他附魔
+            SKillHelper.addXP(player, "magic", 30 * enchantment.level) // 魔法技能
+        }
+    }
+});
+```
+
+## 熔炉事件
+
+当熔炉完成冶炼时触发：
+
+```js
+PmmoJS.furnace((event) => {
+    const level = event.getLevel(); // 获取世界维度
+    const pos = event.getPos(); // 熔炉位置
+    const input = event.getInput(); // 输入物品
+
+    // 获取周围5格范围内的实体
+    level
+        .getEntitiesWithin(
+            AABB.of( // 创建三维区域边界框
+                pos.x - 5,
+                pos.y - 5,
+                pos.z - 5,
+                pos.x + 5,
+                pos.y + 5,
+                pos.z + 5
+            )
+        )
+        .filter((entity) => entity.isPlayer()) // 过滤出玩家
+        .forEach((player) => {
+            // 处理矿石类冶炼
+            if (input.item.id.includes("ore")) {
+                SKillHelper.addXP(player, "smiting", 10); // 锻造技能（注：原版可能存在拼写错误，应为smithing）
+            } 
+            // 处理食物类冶炼
+            else if (input.getId().includes("food")
+                || input.item.getFoodProperties() != null
+                || input.is("#forge:food")) {
+                SKillHelper.addXP(player, "cooking", 10); // 烹饪技能
+            }
+        });
+});
+```
+
+## 回收事件
+
+当玩家回收物品时触发：
+
+```js
+PmmoJS.salvage((event) => {
+    const player = event.getEntity(); // 进行回收的玩家
+    const inputStack = event.getInputStack(); // 输入物品
+    const outputStack = event.getOutputStack(); // 输出物品
+    const salvageData = event.getSalvage(); // 回收数据
+
+    // 获取玩家的工艺技能等级
+    const craftingLevel = SkillHelper.getLevel(player, "crafting")
+
+    // 当工艺等级≥50且回收苹果时
+    if (craftingLevel >= 50 && inputStack.item.id.equals("apple")) {
+        const salvageBuilder = event.getBuilder(); // 获取回收构建器
+        salvageBuilder.setLevelReq({combat:1}); // 设置需要战斗等级1
+        event.setOutputStack(Item.of("apple").withCount(60)); // 设置输出60个苹果
+    }
+});
+```
+
+<Callout variant="info">
+    这些事件会在游戏过程中实时触发，允许您挂钩PMMO的各种操作，
+    修改其默认行为或添加自定义功能。
+</Callout>

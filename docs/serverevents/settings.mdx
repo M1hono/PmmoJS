@@ -1,3 +1,163 @@
+---
+title: Settings Management
+hide_meta: true
+---
+
 # Settings Events
 
-This section contains Settings events for modifying ReqType or XP Awarded.
+This section covers events for configuring skill requirements and XP awards for items, blocks, and entities.
+
+## PMMO Settings Event
+
+The primary event for registering custom PMMO settings and requirements:
+
+```js
+PmmoJS.settings((event) => {
+    // Create item settings for diamond sword
+    event
+        .item("minecraft:diamond_sword")
+        .setRequirement("use", "combat", 10) // Require combat 10 to use
+        .setRequirement("wear", "combat", 15) // Require combat 15 to equip
+        .setXpAward("craft", "smithing", 100) // Grant smithing XP when crafted
+        .setXpAward("use", "combat", 5); // Grant combat XP when used
+
+    // Configure diamond ore block requirements and rewards
+    event
+        .block("minecraft:diamond_ore")
+        .setRequirement("break", "mining", 30) // Mining 30 required to break
+        .setXpAward("break", "mining", 200); // Grant mining XP when broken
+
+    // Zombie entity experience settings
+    event
+        .entity("minecraft:zombie")
+        .setXpAward("kill", "combat", 25) // Combat XP for killing
+        .setXpAward("damage", "ranged", 5); // Ranged XP for damaging
+
+    // Biome-specific experience rewards
+    event.biome("minecraft:plains").setXpAward("travel", "endurance", 1); // Earn endurance XP while moving in plains
+
+    // Nether dimension configuration
+    event
+        .dimension("minecraft:the_nether")
+        .setRequirement("travel", "endurance", 20) // Need endurance 20 to enter
+        .setXpAward("travel", "endurance", 5) // Endurance XP for nether travel
+        .setPositiveEffect("minecraft:fire_resistance", 0); // Auto-apply fire resistance
+
+    // Item salvage configuration for diamond pickaxe
+    event
+        .item("minecraft:diamond_pickaxe")
+        .override(true) // Override default behavior
+        .salvage("diamond") // Chance to recover diamond
+        .baseChance(0.7) // 70% base chance
+        .and("stick") // Additional salvage material
+        .baseChance(1.0) // Always recover stick
+        .done();
+
+    // Dynamic NBT-based requirements for sword usage
+    event
+        .item("minecraft:diamond_sword")
+        .nbtRequirement("use") // Applies when using the sword
+        .behavior("add_to") // Cumulative tracking mode
+        .path("Damage") // Monitor Damage NBT value
+        .greaterThanOrEqual(20, "combat", 5) // Require combat 5 when damage ≥20
+        .done();
+
+    // Multi-skill requirement for golden apple usage
+    event.item("minecraft:golden_apple").requirement("use", {
+        endurance: 50, // Requires endurance 50
+        magic: 25, // And magic 25
+    });
+
+    // Bulk configuration for armor items
+    Ingredient.of("#forge:armors") // Match all armor items
+        .getItemIds()
+        .forEach((item) => {
+            event.item(item).setRequirement("wear", "defense", 10); // Defense 10 to wear any armor
+        });
+
+    // Clear default PMMO configurations
+    event.clearVanillaItemSettings();
+    event.clearVanillaBlockSettings();
+    event.clearVanillaEntitySettings();
+});
+```
+
+## Damage Penalty Events
+
+These events allow you to modify damage penalties when players don't meet requirements:
+
+<Callout>
+    Originally Project MMO solve this event by directly cancel it, now this event allows you to modfy the result.
+</Callout>
+
+### Item Damage Penalty
+
+Adjusts penalties when using items without meeting requirements:
+
+```js
+PmmoJS.itemDamagePenalty((event) => {
+    const player = event.getEntity();
+    const item = event.getItemStack();
+    const currentDamage = event.getDamage();
+
+    // Get requirements considering enchantments
+    const reqData = event.getReqData(false);
+
+    // Special handling for diamond swords
+    if (item.id == "minecraft:diamond_sword") {
+        // Reduce default penalty by 25%
+        event.setDamage(currentDamage * 0.75);
+    }
+
+    // Progressive penalty reduction system
+    const combatReq = reqData.combat || 0;
+    const playerLevel = player.getPMMOData().getLevel("combat");
+    if (playerLevel > combatReq * 0.8) {
+        // Reduce penalty by 50% if close to meeting requirement
+        event.setDamage(currentDamage * 0.5);
+    }
+});
+```
+
+### Entity Damage Penalty
+
+Adjusts penalties when attacking entities without meeting requirements:
+
+```js
+PmmoJS.entityDamagePenalty((event) => {
+    const player = event.getEntity();
+    const target = event.getTarget();
+    const currentDamage = event.getDamage();
+
+    // Get base requirement data
+    const reqData = event.getReqData();
+
+    // Special case for Ender Dragon
+    if (target.type == "minecraft:ender_dragon") {
+        // Halve damage penalty for dragon fights
+        event.setDamage(currentDamage * 0.5);
+    }
+
+    // Level-based damage scaling
+    const combatReq = reqData.combat || 0;
+    const playerLevel = player.getPMMOData().getLevel("combat");
+    const ratio = playerLevel / combatReq;
+
+    if (ratio > 0.5) {
+        // Scale damage linearly when above 50% of required level
+        event.setDamage(currentDamage * ratio);
+    }
+});
+```
+
+## Usage Notes
+
+-   Settings defined through these events override values from data packs
+-   Requirements can be set for multiple skills at once
+-   XP awards can trigger multiple skill gains from a single action
+-   Penalty events fire when players don't meet requirements, allowing you to customize the penalty based on context
+
+<Callout variant="warning">
+    Be cautious when adjusting damage values in penalty events, as extreme
+    changes can unbalance gameplay.
+</Callout>

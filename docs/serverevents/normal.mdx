@@ -1,4 +1,141 @@
+---
+title: Functional Events
+hide_meta: true
+---
+
 # Server Events
 
-This section contains functional server events.
+This section covers functional server events that trigger during gameplay actions.
 
+## XP Event
+
+Triggered when a player gains or loses XP in a skill:
+
+```js
+PmmoJS.xp((event) => {
+    const player = event.getEntity(); // get the player
+    const skill = event.getSkill(); // get the skill
+    const startLevel = event.startLevel(); // get the start level
+    const endLevel = event.endLevel(); // get the end level
+    const isLevelUp = event.isLevelUp(); // get if the player is level up
+    const context = event.getContext(); // get the context
+
+    if (isLevelUp) {
+        // Reward players with diamond every 10 levels
+        if (endLevel % 10 === 0) {
+            player.give(Item.of("minecraft:diamond", 1));
+        }
+
+        // Special reward for reaching magic level 50
+        if (skill === "magic" && endLevel === 50) {
+            player.give(Item.of("minecraft:enchanted_book"));
+        }
+    }
+
+    // Block all mining XP gains
+    if (skill === "mining") {
+        event.cancel();
+    }
+
+    // Check for experience source context
+    if (context.contains("source")) {
+        const source = context.getString("source");
+    }
+});
+```
+
+## Enchant Event
+
+Triggered when a player enchants an item:
+
+```js
+PmmoJS.enchant((event) => {
+    const player = event.getEntity(); // get the player
+    const enchantment = event.getEnchantmentInstance(); // get the enchantment instance
+    const stack = event.getStack(); // get the stack
+
+    // Only process high-level enchantments (III+)
+    if (enchantment.level >= 3) {
+        // Extract clean enchantment name from translation key
+        const enchantName = enchantment.enchantment
+            .getDescriptionId()
+            .replace("enchantment.minecraft.", "");
+
+        // Assign XP based on enchantment type
+        if (enchantName === "sharpness" || enchantName === "power") {
+            SKillHelper.addXP(player, "combat", 50 * enchantment.level) // Melee/ranged combat XP
+        } else if (enchantName === "efficiency" || enchantName === "fortune") {
+            SKillHelper.addXP(player, "mining", 50 * enchantment.level) // Mining/utility XP
+        } else {
+            SKillHelper.addXP(player, "magic", 30 * enchantment.level) // General magic XP
+        }
+    }
+});
+```
+
+## Furnace Event
+
+Triggered when a furnace completes smelting:
+
+```js
+PmmoJS.furnace((event) => {
+    const level = event.getLevel(); // get the level
+    const pos = event.getPos(); // get the position
+    const input = event.getInput(); // get the input
+
+    // Check for players in 5 block radius around furnace
+    level
+        .getEntitiesWithin(
+            AABB.of(
+                pos.x - 5,
+                pos.y - 5,
+                pos.z - 5,
+                pos.x + 5,
+                pos.y + 5,
+                pos.z + 5
+            )
+        )
+        .filter((entity) => entity.isPlayer())
+        .forEach((player) => {
+            // Grant smithing XP for ore processing
+            if (input.item.id.includes("ore")) {
+                SKillHelper.addXP(player, "smiting", 10);
+            } 
+            // Grant cooking XP for food items
+            else if (input.getId().includes("food")
+                || input.item.getFoodProperties() != null
+                || input.is("#forge:food")) {
+                SKillHelper.addXP(player, "cooking", 10);
+            }
+        });
+});
+```
+
+## Salvage Event
+
+Triggered when a player salvages an item:
+
+```js
+PmmoJS.salvage((event) => {
+    const player = event.getEntity(); // get the player
+    const inputStack = event.getInputStack(); // get the input stack
+    const outputStack = event.getOutputStack(); // get the output stack
+    const salvageData = event.getSalvage(); // get the salvage data
+
+    const craftingLevel = SkillHelper.getLevel(player, "crafting")
+
+    // Special handling for apple salvage by high-level crafters
+    if (craftingLevel >= 50 && inputStack.item.id.equals("apple")) {
+        const salvageBuilder = event.getBuilder();
+        // Add combat requirement to salvage operation
+        salvageBuilder.setLevelReq({combat:1});
+        // Multiply output apples by 60
+        event.setOutputStack(Item.of("apple").withCount(60));
+    }
+});
+```
+
+<Callout variant="info">
+    These events trigger in real-time during gameplay, allowing you to hook into
+    PMMO actions and modify their behavior or add custom features.
+</Callout>

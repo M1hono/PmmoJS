@@ -40,6 +40,7 @@ public class GlobalsEventJS extends EventJS {
             @param key The name of the constant
             @param value The value for the constant
             """)
+    @Deprecated
     public GlobalsEventJS addConstant(String key, String value) {
         customConstants.put(key, value);
         return this;
@@ -50,6 +51,7 @@ public class GlobalsEventJS extends EventJS {
             
             @param key The name of the constant to remove
             """)
+    @Deprecated
     public GlobalsEventJS removeConstant(String key) {
         removedConstants.put(key, "");
         return this;

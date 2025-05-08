@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ServerConfigEventJS extends EventJS {
+public class ServerEventJS extends EventJS {
     // General settings
     public static Double creativeReach;
     public static String salvageBlock;
@@ -89,281 +89,281 @@ public class ServerConfigEventJS extends EventJS {
     public static Integer baseChargeCap;
 
     @Info("Sets the creative mode reach distance")
-    public ServerConfigEventJS setCreativeReach(double value) {
+    public ServerEventJS setCreativeReach(double value) {
         creativeReach = value;
         return this;
     }
 
     @Info("Sets the block ID used for salvaging")
-    public ServerConfigEventJS setSalvageBlock(String blockId) {
+    public ServerEventJS setSalvageBlock(String blockId) {
         salvageBlock = blockId;
         return this;
     }
 
     @Info("Enables or disables PMMO treasure loot conditions")
-    public ServerConfigEventJS setTreasureEnabled(boolean enabled) {
+    public ServerEventJS setTreasureEnabled(boolean enabled) {
         treasureEnabled = enabled;
         return this;
     }
 
     @Info("Enables or disables brewing tracking")
-    public ServerConfigEventJS setBrewingTracked(boolean tracked) {
+    public ServerEventJS setBrewingTracked(boolean tracked) {
         brewingTracked = tracked;
         return this;
     }
 
     // Level settings
     @Info("Sets the maximum level for all skills")
-    public ServerConfigEventJS setMaxLevel(Number level) {
+    public ServerEventJS setMaxLevel(Number level) {
         maxLevel = level.intValue();
         return this;
     }
 
     @Info("Sets the percentage of XP lost on death (0.0 - 1.0)")
-    public ServerConfigEventJS setLossOnDeath(Number loss) {
+    public ServerEventJS setLossOnDeath(Number loss) {
         lossOnDeath = loss.doubleValue();
         return this;
     }
 
     @Info("Sets whether loss of XP can cause level loss")
-    public ServerConfigEventJS setLoseLevelsOnDeath(boolean lose) {
+    public ServerEventJS setLoseLevelsOnDeath(boolean lose) {
         loseLevelsOnDeath = lose;
         return this;
     }
 
     @Info("Sets whether only excess XP is lost on death")
-    public ServerConfigEventJS setLoseOnlyExcess(boolean onlyExcess) {
+    public ServerEventJS setLoseOnlyExcess(boolean onlyExcess) {
         loseOnlyExcess = onlyExcess;
         return this;
     }
 
     @Info("Sets whether to use exponential or linear level formula")
-    public ServerConfigEventJS setUseExponentialFormula(boolean exponential) {
+    public ServerEventJS setUseExponentialFormula(boolean exponential) {
         useExponentialFormula = exponential;
         return this;
     }
 
     @Info("Sets a global XP gain modifier")
-    public ServerConfigEventJS setGlobalModifier(double modifier) {
+    public ServerEventJS setGlobalModifier(double modifier) {
         globalModifier = modifier;
         return this;
     }
 
     @Info("Sets an XP modifier for a specific skill")
-    public ServerConfigEventJS addSkillModifier(String skill, double modifier) {
+    public ServerEventJS addSkillModifier(String skill, double modifier) {
         skillModifiers.put(skill, modifier);
         return this;
     }
 
     // Linear level settings
     @Info("Sets the base XP for linear level formula")
-    public ServerConfigEventJS setLinearBaseXp(long baseXp) {
+    public ServerEventJS setLinearBaseXp(long baseXp) {
         linearBaseXp = baseXp;
         return this;
     }
 
     @Info("Sets the per level XP increase for linear level formula")
-    public ServerConfigEventJS setLinearPerLevel(double perLevel) {
+    public ServerEventJS setLinearPerLevel(double perLevel) {
         linearPerLevel = perLevel;
         return this;
     }
 
     // Exponential level settings
     @Info("Sets the base XP for exponential level formula")
-    public ServerConfigEventJS setExponentialBaseXp(int baseXp) {
+    public ServerEventJS setExponentialBaseXp(int baseXp) {
         exponentialBaseXp = baseXp;
         return this;
     }
 
     @Info("Sets the power base for exponential level formula")
-    public ServerConfigEventJS setExponentialPowerBase(double powerBase) {
+    public ServerEventJS setExponentialPowerBase(double powerBase) {
         exponentialPowerBase = powerBase;
         return this;
     }
 
     @Info("Sets the level modifier for exponential level formula")
-    public ServerConfigEventJS setExponentialLevelMod(double levelMod) {
+    public ServerEventJS setExponentialLevelMod(double levelMod) {
         exponentialLevelMod = levelMod;
         return this;
     }
 
     // Requirement settings
     @Info("Enables or disables requirements for specific action types")
-    public ServerConfigEventJS setReqEnabled(ReqType reqType, boolean enabled) {
+    public ServerEventJS setReqEnabled(ReqType reqType, boolean enabled) {
         reqEnabled.put(reqType, enabled);
         return this;
     }
 
     // XP Gain settings
     @Info("Sets the reuse penalty for breaking placed blocks")
-    public ServerConfigEventJS setReusePenalty(double penalty) {
+    public ServerEventJS setReusePenalty(double penalty) {
         reusePenalty = penalty;
         return this;
     }
 
     @Info("Sets whether XP from perks and configs should be added together")
-    public ServerConfigEventJS setSummatedMaps(boolean summated) {
+    public ServerEventJS setSummatedMaps(boolean summated) {
         summatedMaps = summated;
         return this;
     }
 
     // Damage XP settings
     @Info("Adds an XP gain setting for dealing damage")
-    public ServerConfigEventJS addDealDamageXp(String damageType, String skill, Number amount) {
+    public ServerEventJS addDealDamageXp(String damageType, String skill, Number amount) {
         dealDamageXp.computeIfAbsent(damageType, k -> new HashMap<>()).put(skill, amount.longValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for receiving damage")
-    public ServerConfigEventJS addReceiveDamageXp(String damageType, String skill, Number amount) {
+    public ServerEventJS addReceiveDamageXp(String damageType, String skill, Number amount) {
         receiveDamageXp.computeIfAbsent(damageType, k -> new HashMap<>()).put(skill, amount.longValue());
         return this;
     }
 
     // Movement XP settings
     @Info("Adds an XP gain setting for jumping")
-    public ServerConfigEventJS addJumpXp(String skill, Number amount) {
+    public ServerEventJS addJumpXp(String skill, Number amount) {
         jumpXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for sprint jumping")
-    public ServerConfigEventJS addSprintJumpXp(String skill, Number amount) {
+    public ServerEventJS addSprintJumpXp(String skill, Number amount) {
         sprintJumpXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for crouch jumping")
-    public ServerConfigEventJS addCrouchJumpXp(String skill, Number amount) {
+    public ServerEventJS addCrouchJumpXp(String skill, Number amount) {
         crouchJumpXp.put(skill, amount.doubleValue());
         return this;
     }
 
     // Player action XP settings
     @Info("Adds an XP gain setting for breath changes")
-    public ServerConfigEventJS addBreathChangeXp(String skill, Number amount) {
+    public ServerEventJS addBreathChangeXp(String skill, Number amount) {
         breathChangeXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for health changes")
-    public ServerConfigEventJS addHealthChangeXp(String skill, Number amount) {
+    public ServerEventJS addHealthChangeXp(String skill, Number amount) {
         healthChangeXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for health increases")
-    public ServerConfigEventJS addHealthIncreaseXp(String skill, Number amount) {
+    public ServerEventJS addHealthIncreaseXp(String skill, Number amount) {
         healthIncreaseXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for health decreases")
-    public ServerConfigEventJS addHealthDecreaseXp(String skill, Number amount) {
+    public ServerEventJS addHealthDecreaseXp(String skill, Number amount) {
         healthDecreaseXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for sprinting")
-    public ServerConfigEventJS addSprintingXp(String skill, Number amount) {
+    public ServerEventJS addSprintingXp(String skill, Number amount) {
         sprintingXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for being submerged")
-    public ServerConfigEventJS addSubmergedXp(String skill, Number amount) {
+    public ServerEventJS addSubmergedXp(String skill, Number amount) {
         submergedXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for swimming")
-    public ServerConfigEventJS addSwimmingXp(String skill, Number amount) {
+    public ServerEventJS addSwimmingXp(String skill, Number amount) {
         swimmingXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for diving")
-    public ServerConfigEventJS addDivingXp(String skill, Number amount) {
+    public ServerEventJS addDivingXp(String skill, Number amount) {
         divingXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for surfacing")
-    public ServerConfigEventJS addSurfacingXp(String skill, Number amount) {
+    public ServerEventJS addSurfacingXp(String skill, Number amount) {
         surfacingXp.put(skill, amount.doubleValue());
         return this;
     }
 
     @Info("Adds an XP gain setting for sprint swimming")
-    public ServerConfigEventJS addSwimSprintingXp(String skill, Number amount) {
+    public ServerEventJS addSwimSprintingXp(String skill, Number amount) {
         swimSprintingXp.put(skill, amount.doubleValue());
         return this;
     }
 
     // Party settings
     @Info("Sets the party range for XP sharing")
-    public ServerConfigEventJS setPartyRange(Number range) {
+    public ServerEventJS setPartyRange(Number range) {
         partyRange = range.intValue();
         return this;
     }
 
     @Info("Adds a party bonus for a specific skill")
-    public ServerConfigEventJS addPartyBonus(String skill, Number bonus) {
+    public ServerEventJS addPartyBonus(String skill, Number bonus) {
         partyBonus.put(skill, bonus.doubleValue());
         return this;
     }
 
     // Mob scaling settings
     @Info("Enables or disables mob scaling")
-    public ServerConfigEventJS setMobScalingEnabled(boolean enabled) {
+    public ServerEventJS setMobScalingEnabled(boolean enabled) {
         mobScalingEnabled = enabled;
         return this;
     }
 
     @Info("Sets whether mob scaling uses exponential formula")
-    public ServerConfigEventJS setMobUseExponentialFormula(boolean exponential) {
+    public ServerEventJS setMobUseExponentialFormula(boolean exponential) {
         mobUseExponentialFormula = exponential;
         return this;
     }
 
     @Info("Sets the mob scaling area of effect")
-    public ServerConfigEventJS setMobScalingAoe(Number aoe) {
+    public ServerEventJS setMobScalingAoe(Number aoe) {
         mobScalingAoe = aoe.intValue();
         return this;
     }
 
     @Info("Sets the base level for mob scaling")
-    public ServerConfigEventJS setMobScalingBaseLevel(Number baseLevel) {
+    public ServerEventJS setMobScalingBaseLevel(Number baseLevel) {
         mobScalingBaseLevel = baseLevel.intValue();
         return this;
     }
 
     @Info("Sets the linear per level value for mob scaling")
-    public ServerConfigEventJS setMobLinearPerLevel(Number perLevel) {
+    public ServerEventJS setMobLinearPerLevel(Number perLevel) {
         mobLinearPerLevel = perLevel.doubleValue();
         return this;
     }
 
     @Info("Sets the exponential power base for mob scaling")
-    public ServerConfigEventJS setMobExponentialPowerBase(Number powerBase) {
+    public ServerEventJS setMobExponentialPowerBase(Number powerBase) {
         mobExponentialPowerBase = powerBase.doubleValue();
         return this;
     }
 
     @Info("Sets the exponential level modifier for mob scaling")
-    public ServerConfigEventJS setMobExponentialLevelMod(Number levelMod) {
+    public ServerEventJS setMobExponentialLevelMod(Number levelMod) {
         mobExponentialLevelMod = levelMod.doubleValue();
         return this;
     }
 
     @Info("Sets the boss scaling ratio")
-    public ServerConfigEventJS setBossScalingRatio(Number ratio) {
+    public ServerEventJS setBossScalingRatio(Number ratio) {
         bossScalingRatio = ratio.doubleValue();
         return this;
     }
 
     @Info("Adds a mob scaling setting for an attribute")
-    public ServerConfigEventJS addMobScaling(String attributeId, String skill, Number amount) {
+    public ServerEventJS addMobScaling(String attributeId, String skill, Number amount) {
         ResourceLocation resourceLocation = new ResourceLocation(attributeId);
         mobScaling.computeIfAbsent(resourceLocation, k -> new HashMap<>()).put(skill, amount.doubleValue());
         return this;
@@ -371,43 +371,43 @@ public class ServerConfigEventJS extends EventJS {
 
     // Vein miner settings
     @Info("Enables or disables vein mining")
-    public ServerConfigEventJS setVeinEnabled(boolean enabled) {
+    public ServerEventJS setVeinEnabled(boolean enabled) {
         veinEnabled = enabled;
         return this;
     }
 
     @Info("Sets whether vein mining requires explicit settings")
-    public ServerConfigEventJS setRequireSetting(boolean require) {
+    public ServerEventJS setRequireSetting(boolean require) {
         requireSetting = require;
         return this;
     }
 
     @Info("Sets the default consume value for vein mining")
-    public ServerConfigEventJS setDefaultConsume(Number consume) {
+    public ServerEventJS setDefaultConsume(Number consume) {
         defaultConsume = consume.intValue();
         return this;
     }
 
     @Info("Sets the vein charge modifier")
-    public ServerConfigEventJS setVeinChargeModifier(Number modifier) {
+    public ServerEventJS setVeinChargeModifier(Number modifier) {
         veinChargeModifier = modifier.doubleValue();
         return this;
     }
 
     @Info("Adds a tool to the vein blacklist")
-    public ServerConfigEventJS addVeinBlacklist(Item toolId) {
+    public ServerEventJS addVeinBlacklist(Item toolId) {
         veinBlacklist.add(toolId.kjs$getIdLocation().toString());
         return this;
     }
 
     @Info("Sets the base charge rate for vein mining")
-    public ServerConfigEventJS setBaseChargeRate(Number rate) {
+    public ServerEventJS setBaseChargeRate(Number rate) {
         baseChargeRate = rate.doubleValue();
         return this;
     }
 
     @Info("Sets the base charge capacity for vein mining")
-    public ServerConfigEventJS setBaseChargeCap(Number cap) {
+    public ServerEventJS setBaseChargeCap(Number cap) {
         baseChargeCap = cap.intValue();
         return this;
     }
