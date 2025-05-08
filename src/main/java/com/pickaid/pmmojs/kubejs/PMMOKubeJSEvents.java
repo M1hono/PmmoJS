@@ -3,6 +3,7 @@ package com.pickaid.pmmojs.kubejs;
 import com.pickaid.pmmojs.kubejs.events.server.*;
 import com.pickaid.pmmojs.kubejs.events.server.api.EnchantEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.api.FurnaceEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.api.SalvageEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.api.XPEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.confg.*;
 import com.pickaid.pmmojs.kubejs.events.server.penalty.EntityDamagePenaltyEventJS;
@@ -34,6 +35,7 @@ public interface PMMOKubeJSEvents {
     EventHandler ENCHANT = GROUP.server("enchant", () -> EnchantEventJS.class);
     EventHandler FURNACE_BURN = GROUP.server("furnace", () -> FurnaceEventJS.class);
     EventHandler XP = GROUP.server("xp", () -> XPEventJS.class).hasResult();
+    EventHandler SALVAGE = GROUP.server("salvage", () -> SalvageEventJS.class).hasResult();
     EventHandler ITEMSTACK_DAMAGE_PENALTY = GROUP.server("itemstackDamagePenalty", () -> ItemStackDamagePenaltyEventJS.class).hasResult();
     EventHandler ENTITY_DAMAGE_PENALTY = GROUP.server("entityDamagePenalty", () -> EntityDamagePenaltyEventJS.class).hasResult();
 

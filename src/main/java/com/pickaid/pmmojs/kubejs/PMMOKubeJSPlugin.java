@@ -6,6 +6,7 @@ import com.pickaid.pmmojs.utils.NbtPathBuilder;
 import com.pickaid.pmmojs.utils.SkillHelper;
 import dev.latvian.mods.kubejs.KubeJSPlugin;
 import dev.latvian.mods.kubejs.script.BindingsEvent;
+import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ModifierDataType;
 import harmonised.pmmo.api.enums.ObjectType;
@@ -30,6 +31,7 @@ public class PMMOKubeJSPlugin extends KubeJSPlugin {
         event.add("SKillHelper", SkillHelper.class);
         event.add("TagBuilder", TagBuilder.class);
         event.add("NbtPathBuilder", NbtPathBuilder.class);
+        event.add("SalvageBuilder", APIUtils.SalvageBuilder.class);
 
         // Common used Enums.
         event.add("EventType", EventType.class);

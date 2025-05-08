@@ -1,9 +1,13 @@
 package com.pickaid.pmmojs.kubejs.events.server.api;
 
 import dev.latvian.mods.kubejs.player.PlayerEventJS;
+import dev.latvian.mods.kubejs.typings.Info;
 import dev.latvian.mods.rhino.util.HideFromJS;
+import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.events.SalvageEvent;
+import harmonised.pmmo.config.codecs.CodecTypes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 public class SalvageEventJS extends PlayerEventJS {
     SalvageEvent event;
@@ -22,19 +26,39 @@ public class SalvageEventJS extends PlayerEventJS {
         return this.event.getEntity();
     }
 
-//    public void setSalvageKey(ResourceLocation key) {
-//        this.event.salvage = Map.entry(key, salvage.getValue());
-//    }
-//
-//    public void setOutputStack(ItemStack itemStack) {
-//        ServerPlayer player = (ServerPlayer) this.event.getEntity();
-//        player.drop(itemStack, false, true);
-//        Map<String, Long> xpAwards= new HashMap<>();
-//        for (Map.Entry<String, Long> award : salvage.getValue().xpAward().entrySet()) {
-//            xpAwards.merge(award.getKey(), award.getValue(), Long::sum);
-//        }
-//        List<ServerPlayer> party = PartyUtils.getPartyMembersInRange(player);
-//        Core.get(player.level()).awardXP(party, xpAwards);
-//        this.setCanceled(true);
-//    }
+    @Info("""
+            Return the input stack.
+            Get the mainhand item that the player salvages.
+            """)
+    public ItemStack getInputStack() {
+        return this.event.getInputStack();
+    }
+
+    @Info("""
+            get the input stack.
+            """)
+    public ItemStack getOutputStack() {
+        return this.event.getOutputStack();
+    }
+
+    @Info("""
+            Set the output stack.
+            """)
+    public void setOutputStack(ItemStack stack) {
+        this.event.setOutputStack(stack);
+    }
+
+    @Info("""
+            Return the Salvage data.
+            """)
+    public CodecTypes.SalvageData getSalvage() {
+        return this.event.getSalvage();
+    }
+
+    @Info("""
+            Return the Salvage Builder for modifying the original Salvage data.
+            """)
+    public APIUtils.SalvageBuilder getBuilder() {
+        return this.event.getBuilder();
+    }
 }

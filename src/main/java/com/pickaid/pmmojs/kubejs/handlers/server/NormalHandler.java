@@ -3,9 +3,11 @@ package com.pickaid.pmmojs.kubejs.handlers.server;
 import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
 import com.pickaid.pmmojs.kubejs.events.server.api.EnchantEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.api.FurnaceEventJS;
+import com.pickaid.pmmojs.kubejs.events.server.api.SalvageEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.api.XPEventJS;
 import harmonised.pmmo.api.events.EnchantEvent;
 import harmonised.pmmo.api.events.FurnaceBurnEvent;
+import harmonised.pmmo.api.events.SalvageEvent;
 import harmonised.pmmo.api.events.XpEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -26,6 +28,14 @@ public class NormalHandler {
     public static void onXp(XpEvent event) {
         var xpEvent = PMMOKubeJSEvents.XP.post(new XPEventJS(event));
         if (xpEvent.interruptFalse()) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onSalvage(SalvageEvent event) {
+        var salvageEvent = PMMOKubeJSEvents.SALVAGE.post(new SalvageEventJS(event));
+        if (salvageEvent.interruptFalse()) {
             event.setCanceled(true);
         }
     }
