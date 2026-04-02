@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://docs.mihono.cn/logo.png" width="200" height="200" alt="PmmoJS logo" />
+  <img src="/src/main/resources/icon.png" width="200" height="200" alt="PmmoJS logo" />
 
 # PmmoJS
 
