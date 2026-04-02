@@ -6,6 +6,7 @@ import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.features.anticheese.CheeseTracker;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class AntiCheeseEventJS extends EventJS {
@@ -21,6 +22,13 @@ public class AntiCheeseEventJS extends EventJS {
     public static Map<EventType, Boolean> removedNormalizationSettings = new HashMap<>();
 
     public AntiCheeseEventJS() {
+        afkCanSubtract = null;
+        customAfkSettings = new LinkedHashMap<>();
+        removedAfkSettings = new LinkedHashMap<>();
+        customDiminishingSettings = new LinkedHashMap<>();
+        removedDiminishingSettings = new LinkedHashMap<>();
+        customNormalizationSettings = new LinkedHashMap<>();
+        removedNormalizationSettings = new LinkedHashMap<>();
         for (EventType eventType : EventType.values()) {
             removedAfkSettings.put(eventType, false);
             removedDiminishingSettings.put(eventType, false);

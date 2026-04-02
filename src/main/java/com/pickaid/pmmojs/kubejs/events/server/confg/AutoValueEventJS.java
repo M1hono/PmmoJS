@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +50,32 @@ public class AutoValueEventJS extends EventJS {
     public static Boolean autoValuesEnabled;
 
     public AutoValueEventJS() {
+        customItemXpAwards = new LinkedHashMap<>();
+        customBlockXpAwards = new LinkedHashMap<>();
+        customEntityXpAwards = new LinkedHashMap<>();
+        removedItemXpSkills = new LinkedHashMap<>();
+        removedBlockXpSkills = new LinkedHashMap<>();
+        removedEntityXpSkills = new LinkedHashMap<>();
+        customAxeOverride = new LinkedHashMap<>();
+        customHoeOverride = new LinkedHashMap<>();
+        customShovelOverride = new LinkedHashMap<>();
+        customBrewablesOverride = new LinkedHashMap<>();
+        customSmeltablesOverride = new LinkedHashMap<>();
+        customItemReqs = new LinkedHashMap<>();
+        customBlockReqs = new LinkedHashMap<>();
+        removedItemReqSkills = new LinkedHashMap<>();
+        removedBlockReqSkills = new LinkedHashMap<>();
+        customAxeToolOverride = new LinkedHashMap<>();
+        customShovelToolOverride = new LinkedHashMap<>();
+        customHoeToolOverride = new LinkedHashMap<>();
+        customSwordToolOverride = new LinkedHashMap<>();
+        customItemPenalties = new LinkedHashMap<>();
+        customUtensilAttributes = new LinkedHashMap<>();
+        customWearableAttributes = new LinkedHashMap<>();
+        customEntityAttributes = new LinkedHashMap<>();
+        customRaritiesModifier = null;
+        customHardnessModifier = null;
+        autoValuesEnabled = null;
         for (EventType eventType : EventType.values()) {
             customItemXpAwards.put(eventType, new HashMap<>());
             customBlockXpAwards.put(eventType, new HashMap<>());

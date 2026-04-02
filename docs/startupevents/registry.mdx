@@ -1,0 +1,96 @@
+---
+title: Startup Registries
+hide_meta: true
+---
+
+# Startup Registries
+
+Startup events register PMMO structures that must exist before runtime gameplay logic begins.
+
+Use `startup_scripts/` for:
+
+- PMMO predicates
+- PMMO perk type registration
+- direct PMMO registry data
+- startup-side raw Forge event listeners
+
+Use `server_scripts/` for:
+
+- `PmmoJS.trigger(...)`
+- `PmmoJS.internal(...)`
+- PMMO config events
+- command logic
+- ProbeJS generation
+
+## `PmmoJS.registerPredicate`
+
+Registers requirement predicates that PMMO will evaluate during requirement checks.
+
+Available methods:
+
+- `registerActionPredicate(resourceId, reqType, predicate)`
+- `registerBreakPredicate(resourceId, reqType, predicate)`
+- `registerEntityPredicate(resourceId, reqType, predicate)`
+
+Each predicate receives the current `Player` and the relevant target object.
+
+```js
+PmmoJS.registerPredicate(event => {
+  event.registerActionPredicate(PmmoHelper.id('minecraft:stick'), ReqType.WEAPON, (player, stack) => {
+    return player.experienceLevel >= 5
+  })
+})
+```
+
+## `PmmoJS.registerPerk`
+
+Registers new PMMO perk types from `startup_scripts/`.
+
+- Use this event when you are defining a new perk type
+- Use `PmmoJS.perksConfig(...)` when you are editing perk config entries
+
+Reference page:
+
+- [Perk Registration](./perks)
+
+## Direct PMMO Registration
+
+`PmmoHelper` is available in `startup_scripts/` for direct registry registration.
+
+Common helpers:
+
+- `registerRequirementData`
+- `registerXpAwardData`
+- `registerDamageXpAwardData`
+- `registerBonusData`
+- `registerPositiveEffects`
+- `registerNegativeEffects`
+- `registerSalvageData`
+- `registerVeinData`
+- `registerTriggerListener`
+
+```js
+PmmoHelper.registerRequirementData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', ReqType.TOOL, {
+  mining: 10,
+  endurance: 4
+}, true)
+
+PmmoHelper.registerXpAwardData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', EventType.BLOCK_BREAK, {
+  mining: 8
+}, true)
+```
+
+## Raw Forge Events
+
+On core KubeJS `1.20.1`, `ForgeEvents.onEvent(...)` is a startup-script API.
+
+```js
+ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent', event => {
+  console.info(`[PmmoJS] login forge event for ${event.getEntity().getScoreboardName()}`)
+})
+```
+
+## Related
+
+- [Phase Rules](./phases)
+- [Perk Registration](./perks)

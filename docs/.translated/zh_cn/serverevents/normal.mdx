@@ -1,140 +1,156 @@
 ---
-title: 功能事件
+title: 运行时事件
 hide_meta: true
 ---
 
-# 服务器事件
+# 运行时事件
 
-本节介绍在游戏过程中触发的功能性服务器事件
+这些事件会在游戏进行过程中触发，应写在 `server_scripts/` 中。
 
-## 经验事件
+## `PmmoJS.trigger`
 
-当玩家在某个技能中获得或失去经验时触发：
+这个事件桥接了 PMMO 内部的 `EventTriggerRegistry`。只要 Project MMO 某个处理器实际执行了对应 `EventType` 的 trigger listener，KubeJS 就能通过这里接到回调。
 
-```js
-PmmoJS.xp((event) => {
-    const player = event.getEntity(); // 获取玩家实体
-    const skill = event.getSkill(); // 获取当前技能
-    const startLevel = event.startLevel(); // 获取升级前等级
-    const endLevel = event.endLevel(); // 获取升级后等级
-    const isLevelUp = event.isLevelUp(); // 判断是否是升级
-    const context = event.getContext(); // 获取事件上下文
+它的意义是：不再需要为每个 PMMO 处理器单独做一层 KubeJS 包装，你可以统一通过 `PmmoJS.trigger` 监听 `BLOCK_BREAK`、`CRAFT`、`BLOCK_PLACE`、`DEAL_DAMAGE`、`RECEIVE_DAMAGE`、`FISH`、`TAMING`、`SHIELD_BLOCK` 等 PMMO 触发类型。
 
-    if (isLevelUp) { // 如果是升级事件
-        // 每升10级奖励钻石
-        if (endLevel % 10 === 0) {
-            player.give(Item.of("minecraft:diamond", 1));
-        }
+在 PMMO `1.20.1-1.7.40` 中，当前会经过这层桥接的触发类型包括：
 
-        // 魔法技能达到50级时奖励附魔书
-        if (skill === "magic" && endLevel === 50) {
-            player.give(Item.of("minecraft:enchanted_book"));
-        }
-    }
+- `ANVIL_REPAIR`、`BLOCK_BREAK`、`BREAK_SPEED`、`BLOCK_PLACE`、`BREED`、`BREW`、`CONSUME`、`CRAFT`
+- `DEAL_DAMAGE`、`RECEIVE_DAMAGE`、`DEATH`、`ENCHANT`、`ENTITY`、`FISH`、`GROW`
+- `HIT_BLOCK`、`ACTIVATE_BLOCK`、`ACTIVATE_ITEM`
+- `JUMP`、`SPRINT_JUMP`、`CROUCH_JUMP`
+- `GIVEN_AS_TRADE`、`RECEIVED_AS_TRADE`、`TAMING`、`SHIELD_BLOCK`
+- `BREATH_CHANGE`、`HEALTH_CHANGE`、`HEALTH_INCREASE`、`HEALTH_DECREASE`
+- `RIDING`、`EFFECT`、`SPRINTING`、`CROUCH`、`SUBMERGED`、`SWIMMING`、`DIVING`、`SURFACING`、`SWIM_SPRINTING`
 
-    // 禁止采矿技能的经验获取
-    if (skill === "mining") {
-        event.cancel();
-    }
-
-    // 获取经验来源信息（如果有）
-    if (context.contains("source")) {
-        const source = context.getString("source");
-    }
-});
-```
-
-## 附魔事件
-
-当玩家给物品附魔时触发：
+这并不代表 PMMO 的每条运行时逻辑都属于 trigger registry。像维度切换、登录、坐骑、活塞、玩家死亡、爆炸、睡眠等处理器并不是 `EventType` trigger 路径，它们现在通过 `PmmoJS.internal` 单独暴露。
 
 ```js
-PmmoJS.enchant((event) => {
-    const player = event.getEntity(); // 附魔的玩家
-    const enchantment = event.getEnchantmentInstance(); // 附魔实例
-    const stack = event.getStack(); // 被附魔的物品
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+    const player = event.getPlayer()
 
-    // 仅处理3级及以上的附魔
-    if (enchantment.level >= 3) {
-        // 获取纯净的附魔名称（去除命名空间前缀）
-        const enchantName = enchantment.enchantment
-            .getDescriptionId()
-            .replace("enchantment.minecraft.", "");
-
-        // 根据附魔类型分配不同技能的经验
-        if (enchantName === "sharpness" || enchantName === "power") { // 锋利/力量
-            SKillHelper.addXP(player, "combat", 50 * enchantment.level) // 战斗技能
-        } else if (enchantName === "efficiency" || enchantName === "fortune") { // 效率/时运
-            SKillHelper.addXP(player, "mining", 50 * enchantment.level) // 采矿技能
-        } else { // 其他附魔
-            SKillHelper.addXP(player, "magic", 30 * enchantment.level) // 魔法技能
-        }
+    if (player && player.stages.has('peaceful_mining')) {
+        event.addXpAward('mining', 25)
     }
-});
-```
 
-## 熔炉事件
-
-当熔炉完成冶炼时触发：
-
-```js
-PmmoJS.furnace((event) => {
-    const level = event.getLevel(); // 获取世界维度
-    const pos = event.getPos(); // 熔炉位置
-    const input = event.getInput(); // 输入物品
-
-    // 获取周围5格范围内的实体
-    level
-        .getEntitiesWithin(
-            AABB.of( // 创建三维区域边界框
-                pos.x - 5,
-                pos.y - 5,
-                pos.z - 5,
-                pos.x + 5,
-                pos.y + 5,
-                pos.z + 5
-            )
-        )
-        .filter((entity) => entity.isPlayer()) // 过滤出玩家
-        .forEach((player) => {
-            // 处理矿石类冶炼
-            if (input.item.id.includes("ore")) {
-                SKillHelper.addXP(player, "smiting", 10); // 锻造技能（注：原版可能存在拼写错误，应为smithing）
-            } 
-            // 处理食物类冶炼
-            else if (input.getId().includes("food")
-                || input.item.getFoodProperties() != null
-                || input.is("#forge:food")) {
-                SKillHelper.addXP(player, "cooking", 10); // 烹饪技能
-            }
-        });
-});
-```
-
-## 回收事件
-
-当玩家回收物品时触发：
-
-```js
-PmmoJS.salvage((event) => {
-    const player = event.getEntity(); // 进行回收的玩家
-    const inputStack = event.getInputStack(); // 输入物品
-    const outputStack = event.getOutputStack(); // 输出物品
-    const salvageData = event.getSalvage(); // 回收数据
-
-    // 获取玩家的工艺技能等级
-    const craftingLevel = SkillHelper.getLevel(player, "crafting")
-
-    // 当工艺等级≥50且回收苹果时
-    if (craftingLevel >= 50 && inputStack.item.id.equals("apple")) {
-        const salvageBuilder = event.getBuilder(); // 获取回收构建器
-        salvageBuilder.setLevelReq({combat:1}); // 设置需要战斗等级1
-        event.setOutputStack(Item.of("apple").withCount(60)); // 设置输出60个苹果
+    if (player && player.isCreative()) {
+        event.setCancelled(true)
     }
-});
+})
 ```
+
+`PMMOTriggerEventJS` 上常用的方法：
+
+- `getType()`、`getTypeId()`
+- `getForgeEvent()`、`getForgeEventClassName()`
+- `hasPlayer()`、`getPlayer()`、`getServerPlayer()`
+- `getContext()` 以及 `getContextBoolean`、`getContextString`、`putContextInt`、`putContextCompound`
+- `getXpAwards()`、`setXpAwards()`、`setXpAward()`、`addXpAward()`
+- `setCancelled(true)`，它会把 PMMO 内部使用的 `is_cancelled` 标记写回上下文
 
 <Callout variant="info">
-    这些事件会在游戏过程中实时触发，允许您挂钩PMMO的各种操作，
-    修改其默认行为或添加自定义功能。
+    `PmmoJS.trigger` 适合处理 PMMO 的 `EventType` 运行时逻辑。
+    如果你要控制的是没有经过 trigger registry 的 PMMO 处理器，请使用
+    [`PmmoJS.internal`](./internal.mdx)。
+</Callout>
+
+## `PmmoJS.xp`
+
+当 PMMO 为玩家某个技能增减 XP 时触发。
+
+```js
+PmmoJS.xp(event => {
+    const player = event.getEntity()
+    const skill = event.getSkill()
+
+    if (event.isLevelUp() && event.endLevel() % 10 === 0) {
+        player.give(Item.of('minecraft:diamond'))
+    }
+
+    if (skill === 'mining') {
+        event.cancel()
+    }
+})
+```
+
+## `PmmoJS.enchant`
+
+玩家进行附魔时触发。
+
+```js
+PmmoJS.enchant(event => {
+    const ench = event.getEnchantmentInstance()
+    SkillHelper.addXP(event.getEntity(), 'magic', 10 * ench.level)
+})
+```
+
+## `PmmoJS.furnace`
+
+PMMO 熔炉相关逻辑触发时执行。
+
+```js
+PmmoJS.furnace(event => {
+    const input = event.getInput()
+    if (input.id === 'minecraft:iron_ore') {
+        // 自定义逻辑
+    }
+})
+```
+
+## `PmmoJS.salvage`
+
+玩家执行 PMMO 回收时触发。
+
+```js
+PmmoJS.salvage(event => {
+    const builder = event.getBuilder()
+    builder.setSalvageMax(2)
+    event.setOutputStack(Item.of('minecraft:iron_nugget', 2))
+})
+```
+
+## 伤害惩罚事件
+
+- `PmmoJS.itemstackDamagePenalty`
+- `PmmoJS.entityDamagePenalty`
+
+它们用于修改 PMMO 的需求未达标伤害惩罚，而不只是单纯取消原逻辑。
+
+```js
+PmmoJS.itemstackDamagePenalty(event => {
+    event.setDamage(event.getDamage() * 0.75)
+})
+
+PmmoJS.entityDamagePenalty(event => {
+    event.setDamage(event.getDamage() * 0.5)
+})
+```
+
+## `PmmoHelper`
+
+`PmmoHelper` 是推荐直接使用的 PMMO 辅助绑定，目的是绕开 KubeJS 对 Java 重载处理较弱的问题。
+
+```js
+ServerEvents.loaded(event => {
+    const player = event.server.getPlayerList().getPlayers()[0]
+    if (!player) return
+
+    console.log(PmmoHelper.getSkillLevel(player, 'mining'))
+    console.log(PmmoHelper.getItemRequirements(player.mainHandItem, ReqType.WEAR))
+    console.log(PmmoHelper.getCurrentVeinCharge(player))
+})
+```
+
+常用方法分组：
+
+- 技能状态：`getSkillLevel`、`setSkillLevel`、`addSkillXp`、`getAllSkillLevels`
+- 数据查询：`getItemXpAwards`、`getBlockRequirements`、`getConsolidatedModifiers`
+- 直接注册：`registerRequirementData`、`registerXpAwardData`、`registerBonusData`、tooltip 注册、predicate 注册
+- 发现辅助：`getTriggerTypeIds`、`getInternalTypeIds`
+- PMMO 系统：`awardXpToPlayer`、`awardXpToPartyInRange`、`getPartyMembers`、`applyVeinMining`、`triggerSalvage`
+
+<Callout variant="info">
+    `PmmoHelper` 是面向 PMMO 全部常用逻辑的总入口。`SkillHelper` 仍然保留，
+    适合旧脚本或只关心技能等级与 XP 的场景。`client_scripts/` 中不提供
+    `PmmoHelper`。
 </Callout>

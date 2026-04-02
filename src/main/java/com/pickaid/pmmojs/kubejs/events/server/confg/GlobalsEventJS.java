@@ -4,6 +4,7 @@ import dev.latvian.mods.kubejs.event.EventJS;
 import dev.latvian.mods.kubejs.typings.Info;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class GlobalsEventJS extends EventJS {
@@ -12,6 +13,14 @@ public class GlobalsEventJS extends EventJS {
 
     public static Map<String, String> customConstants = new HashMap<>();
     public static Map<String, String> removedConstants = new HashMap<>();
+
+    public GlobalsEventJS() {
+        customPaths = new LinkedHashMap<>();
+        removedPaths = new LinkedHashMap<>();
+        customConstants = new LinkedHashMap<>();
+        removedConstants = new LinkedHashMap<>();
+    }
+
     @Info("""
             Adds or updates a path in the globals configuration.
             

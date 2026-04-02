@@ -1,157 +1,160 @@
 ---
-title: 设置管理
+title: PMMO 设置
 hide_meta: true
 ---
 
-# 设置事件
+# PMMO 设置事件
 
-本节介绍如何为物品、方块和实体配置技能需求与经验奖励
+`PmmoJS.settings` 是从 `server_scripts/` 注册 PMMO 对象数据的主桥接入口。
 
-## PMMO设置事件
+## 单目标 builder
 
-注册自定义PMMO设置和需求的主要事件：
+这些方法一次只创建一个 builder：
 
-```js
-PmmoJS.settings((event) => {
-    // 创建物品设置
-    event
-        .item("minecraft:diamond_sword") // 钻石剑
-        .setRequirement("use", "combat", 10) // 使用需求：战斗技能10级
-        .setRequirement("wear", "combat", 15) // 穿戴需求：战斗技能15级
-        .setXpAward("craft", "smithing", 100) // 合成奖励：锻造技能100XP
-        .setXpAward("use", "combat", 5); // 使用奖励：战斗技能5XP
+- `event.item(itemOrId)`
+- `event.block(blockOrId)`
+- `event.entity(entityTypeOrId)`
+- `event.biome(id)`
+- `event.dimension(id)`
+- `event.generic(objectType, objectOrId)`
 
-    // 创建方块设置
-    event
-        .block("minecraft:diamond_ore") // 钻石矿
-        .setRequirement("break", "mining", 30) // 破坏需求：采矿技能30级
-        .setXpAward("break", "mining", 200); // 破坏奖励：采矿技能200XP
-
-    // 创建实体设置
-    event
-        .entity("minecraft:zombie") // 僵尸
-        .setXpAward("kill", "combat", 25) // 击杀奖励：战斗技能25XP
-        .setXpAward("damage", "ranged", 5); // 造成伤害奖励：远程技能5XP
-
-    // 创建生物群系/维度设置
-    event.biome("minecraft:plains").setXpAward("travel", "endurance", 1); // 平原群系移动奖励：耐力技能1XP
-
-    event
-        .dimension("minecraft:the_nether") // 下界维度
-        .setRequirement("travel", "endurance", 20) // 移动需求：耐力技能20级
-        .setXpAward("travel", "endurance", 5) // 移动奖励：耐力技能5XP
-        .setPositiveEffect("minecraft:fire_resistance", 0); // 自动赋予火焰抵抗效果
-
-    // 物品回收配置
-    event
-        .item("minecraft:diamond_pickaxe") // 钻石镐
-        .override(true) // 覆盖原版设置
-        .salvage("diamond") // 可回收钻石
-        .baseChance(0.7) // 基础概率70%
-        .and("stick") // 同时回收木棍
-        .baseChance(1.0) // 木棍基础概率100%
-        .done();
-
-    // 基于NBT的需求设置
-    event
-        .item("minecraft:diamond_sword") // 钻石剑
-        .nbtRequirement("use") // 使用时的NBT需求
-        .behavior("add_to") // 累计叠加模式
-        .path("Damage") // 监测Damage标签
-        .greaterThanOrEqual(20, "combat", 5) // 当Damage≥20时需求战斗5级
-        .done();
-
-    // 多技能需求配置
-    event.item("minecraft:golden_apple").requirement("use", { // 金苹果使用需求
-        endurance: 50, // 耐力50级
-        magic: 25, // 魔法25级
-    });
-
-    // 使用材料标签匹配
-    Ingredient.of("#forge:armors") // 匹配所有锻造标签的盔甲
-        .getItemIds()
-        .forEach((item) => {
-            event.item(item).setRequirement("wear", "defense", 10); // 穿戴需求：防御10级
-        });
-
-    // 重置原版设置
-    event.clearVanillaItemSettings(); // 清除所有原版物品设置
-    event.clearVanillaBlockSettings(); // 清除所有原版方块设置
-    event.clearVanillaEntitySettings(); // 清除所有原版实体设置
-});
-```
-
-## 伤害惩罚事件
-
-当玩家未满足需求时，可以修改伤害惩罚值：
-
-<Callout>
-    原版Project MMO通过直接取消事件来处理，现在可以通过此事件修改结果
-</Callout>
-
-### 物品伤害惩罚
-
-调整使用未满足需求物品时的惩罚：
+对于 `item`、`block`、`entity`，现在既可以传注册对象，也可以直接传注册表 id 字符串。
 
 ```js
-PmmoJS.itemDamagePenalty((event) => {
-    const player = event.getEntity(); // 获取玩家实体
-    const item = event.getItemStack(); // 获取物品堆栈
-    const currentDamage = event.getDamage(); // 当前惩罚伤害值
+PmmoJS.settings(event => {
+  event
+    .item('minecraft:diamond_sword')
+    .override(true)
+    .setRequirement(ReqType.WEAPON, 'combat', 10)
+    .setXp(EventType.CRAFT, 'smithing', 100)
 
-    // 获取需求数据（false=不忽略附魔）
-    const reqData = event.getReqData(false); 
+  event
+    .block('minecraft:diamond_ore')
+    .override(true)
+    .setRequirement(ReqType.BREAK, 'mining', 30)
+    .setXp(EventType.BLOCK_BREAK, 'mining', 200)
 
-    // 检查特定物品或类别
-    if (item.id == "minecraft:diamond_sword") { // 如果是钻石剑
-        event.setDamage(currentDamage * 0.75); // 减少25%惩罚
-    }
-
-    // 根据玩家接近需求程度调整惩罚
-    const combatReq = reqData.combat || 0; // 获取战斗需求等级
-    const playerLevel = player.getPMMOData().getLevel("combat"); // 玩家当前战斗等级
-    if (playerLevel > combatReq * 0.8) { // 达到需求等级的80%
-        event.setDamage(currentDamage * 0.5); // 惩罚减半
-    }
-});
+  event
+    .entity('minecraft:zombie')
+    .override(true)
+    .setXp(EventType.DEATH, 'combat', 25)
+})
 ```
 
-### 实体伤害惩罚
+## 批量应用 helper
 
-调整攻击未满足需求实体时的惩罚：
+这些方法会把同一个 builder 回调应用到多个目标：
+
+- `event.items(targets, callback)`
+- `event.blocks(targets, callback)`
+- `event.entities(targets, callback)`
+- `event.biomes(targets, callback)`
+- `event.dimensions(targets, callback)`
+- `event.genericMany(objectType, targets, callback)`
+
+`targets` 可以是：
+
+- 单个 id
+- 单个注册对象
+- JS 数组
+- Java list 或其他 iterable
+
+当你要一次给很多对象套用同一套 PMMO 规则时，这就是推荐写法。
 
 ```js
-PmmoJS.entityDamagePenalty((event) => {
-    const player = event.getEntity(); // 获取玩家
-    const target = event.getTarget(); // 获取目标实体
-    const currentDamage = event.getDamage(); // 当前惩罚伤害值
+PmmoJS.settings(event => {
+  event.items([
+    'minecraft:diamond_sword',
+    'minecraft:netherite_sword',
+    'minecraft:trident'
+  ], setting => {
+    setting.override(true)
+    setting.setRequirement(ReqType.WEAPON, 'combat', 20)
+    setting.setXp(EventType.CRAFT, 'smithing', 150)
+  })
 
-    // 获取需求数据
-    const reqData = event.getReqData();
-
-    // 处理特定实体类型
-    if (target.type == "minecraft:ender_dragon") { // 末影龙特殊处理
-        event.setDamage(currentDamage * 0.5); // 伤害惩罚减半
-    }
-
-    // 根据玩家等级比例调整
-    const combatReq = reqData.combat || 0; // 战斗需求等级
-    const playerLevel = player.getPMMOData().getLevel("combat"); // 玩家当前等级
-    const ratio = playerLevel / combatReq; // 计算等级比例
-
-    if (ratio > 0.5) { // 达到需求等级的50%
-        event.setDamage(currentDamage * ratio); // 按比例调整伤害
-    }
-});
+  event.entities([
+    'minecraft:villager',
+    'minecraft:wandering_trader'
+  ], setting => {
+    setting.override(true)
+    setting.setRequirement(ReqType.ENTITY_INTERACT, 'charisma', 8)
+  })
+})
 ```
 
-## 使用说明
+## 通用 builder 方法
 
--   通过这些事件定义的设置会覆盖数据包中的值
--   可以同时为多个技能设置需求
--   单个操作可以触发多个技能的经验奖励
--   惩罚事件在玩家未满足需求时触发，允许根据上下文自定义惩罚
+所有设置 builder 都继承这些常用方法：
 
-<Callout variant="warning">
-    调整惩罚事件中的伤害值时需谨慎，极端修改可能导致游戏平衡性问题
-</Callout>
+- `setRequirement(reqType, skill, level)`
+- `requirement(reqType, map)`
+- `setXp(eventType, skill, amount)`
+- `xp(eventType, map)`
+- `override(boolean)`
+
+## 按类型提供的额外能力
+
+根据 builder 的具体类型，你还可以使用：
+
+- 物品回收配置
+- 物品与实体伤害类型 XP 注册
+- 正负面药水效果注册
+- 地点类 mob modifier
+- 矿脉连锁充能配置
+- NBT requirement、NBT XP、NBT bonus builder
+
+例如：
+
+```js
+PmmoJS.settings(event => {
+  event
+    .item('minecraft:diamond_pickaxe')
+    .override(true)
+    .veinChargeCap(128)
+    .veinChargeRate(1.25)
+    .veinConsumeAmount(2)
+})
+```
+
+## 清空默认数据
+
+如果你想不写脚本就清掉大类 PMMO 默认数据，优先改 `config/pmmojs-common.toml`：
+
+- `disableDefaultSettings.all`
+- `disableDefaultSettings.skills`
+- `disableDefaultSettings.perks`
+- `disableDefaultSettings.requirements`
+- `disableDefaultSettings.xpAwards`
+- `disableDefaultSettings.itemExtras`
+- `disableDefaultSettings.blockVeinData`
+
+设置事件还保留这些旧的辅助方法：
+
+- `clearVanillaItemSettings()`
+- `clearVanillaBlockSettings()`
+- `clearVanillaEntitySettings()`
+
+应把它们看作需求重置 helper，而不是完整的 PMMO 全量清空接口。
+
+它们只能处理大范围的 requirement override，不能完整重置这些类别：
+
+- XP 奖励
+- bonus
+- 正负面效果
+- salvage
+- vein 数据
+- biome 与 dimension 设置
+
+重置顺序、脚本写法与 location 限制请看 [清空默认数据](./reset-recipes)。
+
+## 枚举名要以 PMMO 实际版本为准
+
+请使用当前 PMMO jar 里真实存在的枚举名。例如：
+
+- `ReqType.ENTITY_INTERACT` 存在
+- `ReqType.ENTITY` 不存在
+- `EventType.BLOCK_BREAK` 存在
+- `EventType.BREAK` 不存在
+- `EventType.DEATH` 存在
+- `EventType.KILL` 不存在

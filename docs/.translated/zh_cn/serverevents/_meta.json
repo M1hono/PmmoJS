@@ -1,5 +1,7 @@
 {
-  "normal.mdx": "功能事件",
-  "config.mdx": "核心配置",
-  "settings.mdx": "设置管理"
+  "normal.mdx": "运行时事件",
+  "internal.mdx": "内部钩子",
+  "config.mdx": "配置事件",
+  "settings.mdx": "PMMO 设置",
+  "reset-recipes.mdx": "清空默认数据"
 }

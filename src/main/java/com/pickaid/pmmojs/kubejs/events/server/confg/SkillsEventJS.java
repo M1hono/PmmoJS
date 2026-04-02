@@ -12,6 +12,11 @@ public class SkillsEventJS extends EventJS {
     public static Map<String, SkillData> customSkills = new HashMap<>();
     public static List<String> removedSkills = new ArrayList<String>();
 
+    public SkillsEventJS() {
+        customSkills = new LinkedHashMap<>();
+        removedSkills = new ArrayList<>();
+    }
+
     public Builder addSkill(String string) {
         return Builder.start(string);
     }

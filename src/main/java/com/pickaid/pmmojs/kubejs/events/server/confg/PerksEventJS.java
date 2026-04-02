@@ -4,6 +4,7 @@ import dev.latvian.mods.kubejs.event.EventJS;
 import dev.latvian.mods.kubejs.typings.Info;
 import harmonised.pmmo.api.enums.EventType;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
@@ -20,6 +21,10 @@ public class PerksEventJS extends EventJS {
     public static List<String> removedPerkTypes = new ArrayList<>();
 
     public PerksEventJS() {
+        customPerks = new LinkedHashMap<>();
+        clearedPerks = new ArrayList<>();
+        removedPerks = new ArrayList<>();
+        removedPerkTypes = new ArrayList<>();
         for (EventType eventType : EventType.values()) {
             customPerks.put(eventType, new ArrayList<>());
         }
@@ -250,7 +255,7 @@ public class PerksEventJS extends EventJS {
         public PerkBuilder withMilestones(Number... milestones) {
             ListTag list = new ListTag();
             for (Number milestone : milestones) {
-                list.add(StringTag.valueOf(String.valueOf(milestone.intValue())));
+                list.add(DoubleTag.valueOf(milestone.doubleValue()));
             }
             tag.put("milestones", list);
             return this;

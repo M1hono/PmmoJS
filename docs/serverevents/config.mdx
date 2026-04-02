@@ -1,220 +1,207 @@
 ---
-title: Core Configuration
+title: Config Events
 hide_meta: true
 ---
 
 # Config Events
 
-Configure PMMO's core systems through these server-side events.
+These hooks let you adjust PMMO config data from `server_scripts/`.
 
-## Anti-Cheese Configuration
+## Common Config: `config/pmmojs-common.toml`
 
-The anti-cheese system prevents XP exploitation through AFK farming and repetitive actions.
+Before KubeJS config events run, PmmoJS can suppress PMMO's built-in defaults through Forge common config.
 
-```js
-PmmoJS.antiCheese((event) => {
-    event.setAfkCanSubtract(false);
+Use this when you want your pack to start from a cleaner baseline without copying large reset scripts into `server_scripts/`.
 
-    event
-        .addAfkSetting(EventType.BREAK)
-        .minTime(600) // 30 seconds before penalties apply
-        .reduction(0.1) // 10% reduction per half-second
-        .cooloff(5) // Reduce AFK time by 5 ticks per half-second when not AFK
-        .tolerance(3.0) // Distance tolerance for AFK detection
-        .strictTolerance(true) // Consider camera movement
-        .build();
-
-    // Add diminishing returns for repeated actions
-    event
-        .addDiminishingSetting(EventType.KILL)
-        .retention(6000) // 5 minutes before reset
-        .reduction(0.1) // 10% reduction per repeat
-        .build();
-
-    // Add normalization for extreme XP gains
-    event
-        .addNormalizationSetting(EventType.CRAFT)
-        .retention(1200) // 1 minute tracking
-        .toleranceFlat(50) // Flat tolerance for small XP
-        .tolerancePercent(0.2) // 20% tolerance for large XP
-        .build();
-});
+```toml
+[disableDefaultSettings]
+all = false
+skills = false
+perks = false
+requirements = false
+xpAwards = false
+itemExtras = false
+blockVeinData = false
 ```
 
-## Auto Values
+Order of operations:
 
-Configure automatic XP awards and requirement calculations.
+1. PmmoJS reads `pmmojs-common.toml`
+2. enabled reset categories clear PMMO defaults
+3. `PmmoJS.skillsConfig`, `PmmoJS.perksConfig`, and `PmmoJS.settings` apply your custom data
 
-```js
-PmmoJS.autoValues((event) => {
-    // Global settings
-    event
-        .setAutoValuesEnabled(true)
-        .setRaritiesModifier(1.5)
-        .setHardnessModifier(2.0);
+That means the common config gives you an empty baseline, but your scripts still win afterward.
 
-    // XP awards
-    event.addItemXpAward(EventType.CRAFT, "smithing", 25);
-    event.addBlockXpAward(EventType.BREAK, "mining", 50);
-    event.addEntityXpAward(EventType.KILL, "combat", 100);
+## `PmmoJS.skillsConfig`
 
-    // Remove skills from auto-calculations
-    event.removeItemXpSkill(EventType.CRAFT, "agility");
-
-    // Tool-specific overrides
-    event.setAxeOverride({
-        woodcutting: 15,
-        foraging: 5,
-    });
-
-    // Requirements
-    event.addItemReq(ReqType.WEAR, "defense", 10);
-    event.addBlockReq(ReqType.BREAK, "mining", 5);
-});
-```
-
-## Perks Configuration
-
-Define perks that players unlock at specific skill levels.
-For some variables, check [here](https://moddedmc.wiki/en/project/pmmo/1.20.1/core/perks)
-
-```js
-PmmoJS.perksConfig((event) => {
-    // Add a jump boost perk that increases with agility level
-    event
-        .addPerk(EventType.JUMPED, "pmmo:jump_boost", "agility")
-        .asJumpBoostPerk()
-        .withMinLevel(10)
-        .withBase(0.05)
-        .withPerLevel(0.01)
-        .withMaxBoost(0.5)
-        .build();
-
-    // Add a damage boost for specific weapons
-    event
-        .addPerk(EventType.DEAL_DAMAGE, "pmmo:damage_boost", "combat")
-        .asDamageBoostPerk()
-        .forWeapons("minecraft:sword", "minecraft:axe")
-        .withBase(0.1)
-        .withPerLevel(0.01)
-        .withMaxBoost(1.0)
-        .withCooldown(100)
-        .build();
-
-    // Add a potion effect perk
-    event
-        .addPerk(EventType.KILL, "pmmo:regen_effect", "endurance")
-        .asEffectPerk()
-        .withEffect("minecraft:regeneration")
-        .withDuration(200)
-        .withModifier(0)
-        .withMinLevel(25)
-        .withChance(0.15)
-        .build();
-
-    // Clear all perks of a specific type
-    event.clearPerks(EventType.BLOCK_PLACE);
-
-    // Remove a specific perk type
-    event.removePerkType("pmmo:fireworks");
-});
-```
-
-## Skills Configuration
-
-Define skills and skill groups.
+Use this event to add, replace, or remove PMMO skills.
 
 ```js
 PmmoJS.skillsConfig((event) => {
     event
-        .addSkill("test")
-        .withColor(0xa52a2a)
-        .withIcon(new ResourceLocation("pmmo", "textures/skills/archery.png"))
-        .withIconSize(32)
+        .addSkill("defense")
+        .withColor(0x2f6fed)
         .withMaxLevel(100)
+        .withIconSize(18)
         .build();
 
-    event
-        .addSkill("combat")
-        .withColor(0xff0000)
-        .withUseTotal(true)
-        .setGroupOf({
-            swordsmanship: 0.6,
-            archery: 0.4,
-        })
-        .build();
-
-    // Use this to remove default Skills.
-    event.removeDefaultSkill("swiming");
-    // If you want to modfy them.
-    const test = SKillHelper.getSkill("test");
-    event.removeDefaultSkill("test");
-    event
-        .addSkill("test")
-        .withAfkExempt(test.afkExempt())
-        .withColor(test.color())
-        .withUseTotal(test.useTotalLevels())
-        .withIcon(test.icon())
-        .withIconSize(test.iconSize())
-        .withDisplayName(test.displayGroupName())
-        .withMaxLevel(test.maxLevel());
+    event.removeDefaultSkill("swimming");
 });
 ```
 
-## Server Configuration
+If you remove and re-add the same skill in one pass, the custom skill wins.
 
-Modify core server settings.
+## `PmmoJS.globalsConfig`
 
-```js
-PmmoJS.serverConfig((event) => {
-    // All config values for server configs with docs.
-    event
-        .setCreativeReach(15.0)
-        .setSalvageBlock("minecraft:anvil")
-        .setTreasureEnabled(true);
-
-    event
-        .setMaxLevel(100)
-        .setLossOnDeath(0.1)
-        .setLoseLevelsOnDeath(false)
-        .setUseExponentialFormula(true);
-
-    event
-        .setExponentialBaseXp(100)
-        .setExponentialPowerBase(1.05)
-        .setExponentialLevelMod(1.15);
-
-    event
-        .setReqEnabled(ReqType.BREAK, true)
-        .setReqEnabled(ReqType.PLACE, false);
-
-    event
-        .addJumpXp("agility", 0.5)
-        .addSprintJumpXp("agility", 1.0)
-        .addSwimmingXp("swimming", 0.2);
-
-    event
-        .addDealDamageXp("minecraft:player", "combat", 5)
-        .addReceiveDamageXp("minecraft:fall", "endurance", 2);
-
-    event.setVeinEnabled(true).setBaseChargeRate(0.5).setBaseChargeCap(1000);
-});
-```
-
-## Globals Configuration
-
-Define global paths and constants for data access.
+Use this event to manage PMMO globals such as reusable NBT paths and constants.
 
 ```js
 PmmoJS.globalsConfig((event) => {
     event.addPath("durability", "Damage");
     event.addConstant("MAX_SKILL_LEVEL", "100");
-    event.remove("unused_path");
+    event.removePath("old_path");
     event.removeConstant("OLD_CONSTANT");
 });
 ```
 
+## `PmmoJS.perksConfig`
+
+Use this event to edit existing PMMO perk data.
+
+```js
+PmmoJS.perksConfig((event) => {
+    event.clearPerks(EventType.SKILL_UP);
+    event.removePerkType("pmmo:fireworks");
+});
+```
+
+Core control methods:
+
+- `addPerk(eventType, perkId, skill)`
+- `clearPerks(eventType)`
+- `removePerkType(perkId)`
+- `removePerk(tag)`
+
+Config merge behavior:
+
+1. PmmoJS starts from PMMO's current `PerksConfig.PERK_SETTINGS`
+2. `clearPerks(eventType)` replaces that event's list with an empty list
+3. `removePerkType(perkId)` removes every matching `perk` entry across all events
+4. `removePerk(tag)` removes entries by `perk` plus `skill`
+5. `addPerk(...)` appends new perk tags to the selected event list
+
+Base config keys written by the builder:
+
+| Method | Written Key |
+| --- | --- |
+| `addPerk(eventType, perkId, skill)` | `perk`, `skill` |
+| `withCooldown(...)` | `cooldown` |
+| `withChance(...)` | `chance` |
+| `withMinLevel(...)` | `min_level` |
+| `withMaxLevel(...)` | `max_level` |
+| `withPerXLevel(...)` | `per_x_level` |
+| `withMilestones(...)` | `milestones` |
+| `withString(...)`, `withBool(...)`, `withInt(...)`, `withLong(...)`, `withFloat(...)`, `withDouble(...)` | custom scalar keys |
+| `withStringList(...)` | custom string-list keys |
+| `withList(...)` | raw `ListTag` keys |
+| `withCompound(...)` | nested compound keys |
+
+Specialized builder families:
+
+The table below describes the keys exposed by each builder. A key being exposed by PmmoJS does not guarantee that PMMO uses that key for every perk type.
+
+| Builder | Extra Keys |
+| --- | --- |
+| `asAttributePerk()` | `attribute`, `multiplicative`, plus `max_boost`, `per_level`, `base` |
+| `asTempAttributePerk()` | `attribute`, `multiplicative`, `duration`, plus `max_boost`, `per_level`, `base` |
+| `asDamageBoostPerk()` | `applies_to`, `for_damage`, `multiplicative`, plus `max_boost`, `per_level`, `base` |
+| `asDamageReducePerk()` | `for_damage`, plus `max_boost`, `per_level`, `base` |
+| `asBreakSpeedPerk()` | `pickaxe_dig`, `axe_dig`, `shovel_dig`, `hoe_dig`, `shears_dig`, `sword_dig`, plus `max_boost`, `per_level`, `base` |
+| `asEffectPerk()` | `effect`, `duration`, `modifier`, `ambient`, `visible`, `show_icon`, plus `max_boost`, `per_level`, `base` |
+| `asCommandPerk()` | `command`, `function`, plus inherited base-key methods |
+| `asFireworksPerk()` | `colors`, plus inherited base-key methods |
+| `asJumpBoostPerk()` | `max_boost`, `per_level`, `base` |
+| `asBreathPerk()` | `max_boost`, `per_level`, `base` |
+| `asVillagerBoostPerk()` | `max_boost`, `per_level`, `base` |
+| `asTameBoostPerk()` | `max_boost`, `per_level`, `base` |
+
+Example:
+
+```js
+PmmoJS.perksConfig(event => {
+  event
+    .addPerk(EventType.SKILL_UP, 'pmmo:attribute', 'endurance')
+    .asAttributePerk()
+    .withAttribute(Java.loadClass('net.minecraft.world.entity.ai.attributes.Attributes').MAX_HEALTH)
+    .withPerLevel(1)
+    .withMaxBoost(10)
+    .build()
+})
+```
+
+For startup custom perks and PMMO event input/output tags, see:
+
+- [Custom Perk Tags](../startupevents/custom-perk-tags)
+- [Tag Model](../tag-model)
+- [Reset Defaults](./reset-recipes)
+
+## `PmmoJS.serverConfig`
+
+Use this event for PMMO's server config values.
+
+```js
+PmmoJS.serverConfig((event) => {
+    event
+        .setMaxLevel(100)
+        .setGlobalModifier(1.0)
+        .setUseExponentialFormula(true)
+        .setTreasureEnabled(true);
+
+    event.addSkillModifier("defense", 1.1);
+    event.addJumpXp("agility", 0.5);
+    event.addPartyBonus("charisma", 0.1);
+});
+```
+
+## `PmmoJS.autoValueConfig`
+
+Use this event to override PMMO auto-value generation.
+
+```js
+PmmoJS.autoValueConfig((event) => {
+    event
+        .setAutoValuesEnabled(true)
+        .setRaritiesModifier(1.5)
+        .setHardnessModifier(2.0);
+
+    event.addItemXpAward(EventType.CRAFT, "smithing", 25);
+    event.addBlockReq(ReqType.BREAK, "mining", 5);
+    event.setAxeOverride({
+        woodcutting: 15,
+    });
+});
+```
+
+## `PmmoJS.antiCheeseConfig`
+
+Use this event to edit AFK, diminishing-return, and normalization settings.
+
+```js
+PmmoJS.antiCheeseConfig((event) => {
+    event.setAfkCanSubtract(false);
+
+    event
+        .addAfkSetting(EventType.BLOCK_BREAK)
+        .minTime(600)
+        .reduction(0.1)
+        .cooloff(5)
+        .tolerance(3.0)
+        .strictTolerance(true)
+        .build();
+});
+```
+
 <Callout variant="info">
-    Configuration events are applied during server startup and may require a
-    restart to take effect.
+    These config hooks are applied from the server/static-data reload path so they
+    stay compatible with PMMO config reloads and EMI tag synchronization.
 </Callout>

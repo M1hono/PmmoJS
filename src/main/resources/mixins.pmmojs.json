@@ -5,8 +5,17 @@
   "minVersion": "0.8",
   "mixins": [
     "AutoValueConfigAccessor",
+    "ConfigObjectAccessor",
     "DamageDealtHandlerMixin",
-    "PlayerMixin"
+    "DimensionTravelHandlerMixin",
+    "ExplosionHandlerMixin",
+    "LoginHandlerMixin",
+    "MountHandlerMixin",
+    "PistonHandlerMixin",
+    "PlayerDeathHandlerMixin",
+    "PlayerMixin",
+    "PotionHandlerMixin",
+    "SleepHandlerMixin"
   ],
   "client": [
   ],

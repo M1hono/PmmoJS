@@ -1,0 +1,82 @@
+---
+title: Internal Hooks
+hide_meta: true
+---
+
+# Internal Hooks
+
+`PmmoJS.internal` covers PMMO handler paths that do not go through PMMO's `EventTriggerRegistry`.
+
+Use this when you need to intercept Project MMO logic such as login sync, dimension travel checks, mount checks, piston chunk tracking, explosion filtering, player death XP loss, or potion brewing.
+
+Supported internal hook ids on PMMO `1.20.1-1.7.40`:
+
+- `DIMENSION_TRAVEL`
+- `EXPLOSION`
+- `LOGIN`
+- `MOUNT`
+- `PISTON`
+- `PLAYER_DEATH`
+- `POTION_BREW`
+- `SLEEP_FINISHED`
+
+`PMMOInternalEventJS` has two separate control paths:
+
+- `return false` or `event.skipPmmo()` skips PMMO's built-in handler logic but does not automatically cancel the underlying Forge action.
+- `event.deny()` or `event.setActionCancelled(true)` cancels the wrapped Forge action when that Forge event is cancelable, and also skips PMMO's own handler.
+
+```js
+PmmoJS.internal(PMMOInternalType.DIMENSION_TRAVEL, event => {
+    const player = event.getPlayer()
+    if (!player) return
+
+    if (player.stages.has('pmmo_bypass_travel')) {
+        event.skipPmmo()
+    }
+
+    if (player.stages.has('pmmo_lock_dimensions')) {
+        event.deny()
+    }
+})
+```
+
+For potion brewing, `POTION_BREW` gives you the final PMMO XP award map and the tracking flag used by PMMO's brewed-item guard:
+
+```js
+PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
+    if (event.getContextBoolean('alreadyTracked')) {
+        return
+    }
+
+    event.addXpAward('alchemy', 10)
+    event.putContextBoolean('markBrewed', true)
+})
+```
+
+Useful members on `PMMOInternalEventJS`:
+
+- `getType()` and `getTypeId()`
+- `getForgeEvent()` and `getForgeEventClassName()`
+- `hasPlayer()`, `getPlayer()`, and `getServerPlayer()`
+- `shouldSkipPmmo()`, `setSkipPmmo(true)`, and `skipPmmo()`
+- `canCancelAction()`, `isActionCancelled()`, `setActionCancelled(true)`, and `deny()`
+- `getContext()` plus the `getContext*` and `putContext*` helpers
+- `getXpAwards()`, `setXpAwards()`, `setXpAward()`, and `addXpAward()`
+
+<Callout variant="info">
+    `POTION_BREW` is also wired into `PmmoJS.trigger(EventType.BREW, ...)` now.
+    Use `PmmoJS.trigger` when you want PMMO `EventType`-style behavior, and use
+    `PmmoJS.internal` when you need the handler-specific control surface.
+</Callout>
+
+## ProbeJS
+
+PmmoJS does not need a custom ProbeJS-only Java event.
+
+ProbeJS already exposes `ProbeJSEvents.generateDoc`, so the recommended approach is:
+
+- keep strong `@Info` annotations and typed `Extra` metadata in Java
+- add ProbeJS snippets or doc transforms through `ProbeJSEvents.generateDoc`
+- use the shipped dev scripts in `run/kubejs/server_scripts/pmmojs_probe_docs.js` and `run/kubejs/server_scripts/pmmojs_test_runtime.js` as the reference pattern
+
+That keeps ProbeJS support aligned with the rest of KubeJS instead of splitting documentation into a separate custom event system.

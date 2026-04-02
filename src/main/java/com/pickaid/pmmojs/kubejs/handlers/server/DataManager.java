@@ -1,10 +1,12 @@
 package com.pickaid.pmmojs.kubejs.handlers.server;
 
 import com.pickaid.pmmojs.PmmoJS;
+import com.pickaid.pmmojs.config.PmmoDefaultSettingsDisabler;
 import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
 import com.pickaid.pmmojs.kubejs.events.server.*;
 import com.pickaid.pmmojs.kubejs.events.server.confg.*;
 import com.pickaid.pmmojs.mixin.AutoValueConfigAccessor;
+import com.pickaid.pmmojs.mixin.ConfigObjectAccessor;
 import dev.latvian.mods.kubejs.util.ConsoleJS;
 import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ReqType;
@@ -22,6 +24,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.event.TagsUpdatedEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -30,27 +33,28 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid = PmmoJS.ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DataManager {
     public static boolean loaded = false;
-    private static boolean configsUpdated = false;
 
     @SubscribeEvent
     public static void onSettingsSyncEvent(PMMORegistrationEvent event) {
+        PmmoDefaultSettingsDisabler.applyDefaultSettingsResets();
         PMMOKubeJSEvents.SETTINGS.post(new PMMOSettingEventJS());
     }
 
     @SubscribeEvent
     public static void onServerLoaded(ServerStartedEvent event) {
-        if (!loaded) {
-            loaded = true;
-        }
+        loaded = true;
+        updateConfigs();
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        loaded = false;
     }
 
     @SubscribeEvent
     public static void updateConfigs(TagsUpdatedEvent event) {
-        if (!configsUpdated && loaded) {
+        if (loaded && event.shouldUpdateStaticData()) {
             updateConfigs();
-            configsUpdated = true;
-        } else if (configsUpdated && loaded) {
-            configsUpdated = false;
         }
     }
 
@@ -65,82 +69,70 @@ public class DataManager {
     }
 
     private static void updateSkillsConfig() {
-        Object skillConfig = SkillsConfig.SKILLS.get();
-        if (skillConfig instanceof Map<?,?>) {
-            Map<String, SkillData> skillsMap = (Map<String, SkillData>) skillConfig;
-            PMMOKubeJSEvents.SKILL_CONFIG.post(new SkillsEventJS());
-            skillsMap.putAll(SkillsEventJS.customSkills);
-            for (String skillId : SkillsEventJS.removedSkills) {
-                skillsMap.remove(skillId);
-            }
-        }
+        PMMOKubeJSEvents.SKILL_CONFIG.post(new SkillsEventJS());
+
+        Map<String, SkillData> updatedSkills = copyMap(SkillsConfig.SKILLS.get());
+        PmmoDefaultSettingsDisabler.applySkillDefaults(updatedSkills);
+        SkillsEventJS.removedSkills.forEach(updatedSkills::remove);
+        updatedSkills.putAll(SkillsEventJS.customSkills);
+        setConfigObject(SkillsConfig.SKILLS, updatedSkills);
     }
 
     private static void updatePerksConfig() {
-        Map<EventType, List<CompoundTag>> perksConfig = PerksConfig.PERK_SETTINGS.get();
-        if (perksConfig instanceof Map) {
-            PMMOKubeJSEvents.PERK_CONFIG.post(new PerksEventJS());
-            Map<EventType, List<CompoundTag>> perksMap = perksConfig;
+        PMMOKubeJSEvents.PERK_CONFIG.post(new PerksEventJS());
 
-            for (EventType eventType : PerksEventJS.clearedPerks) {
-                if (perksMap.containsKey(eventType)) {
-                    perksMap.get(eventType).clear();
-                }
-            }
+        Map<EventType, List<CompoundTag>> perksMap = copyPerkSettings(PerksConfig.PERK_SETTINGS.get());
+        PmmoDefaultSettingsDisabler.applyPerkDefaults(perksMap);
 
-            for (String perkType : PerksEventJS.removedPerkTypes) {
-                for (EventType eventType : EventType.values()) {
-                    if (perksMap.containsKey(eventType)) {
-                        List<CompoundTag> perksList = perksMap.get(eventType);
-                        Iterator<CompoundTag> iterator = perksList.iterator();
-                        while (iterator.hasNext()) {
-                            CompoundTag tag = iterator.next();
-                            if (tag.getString("perk").equals(perkType)) {
-                                iterator.remove();
-                                ConsoleJS.SERVER.info("Removing perk type: " + perkType +
-                                        " for skill: " + tag.getString("skill") +
-                                        " from event: " + eventType.name());
-                            }
-                        }
-                    }
-                }
-            }
+        for (EventType eventType : PerksEventJS.clearedPerks) {
+            perksMap.put(eventType, new ArrayList<>());
+        }
 
+        for (String perkType : PerksEventJS.removedPerkTypes) {
             for (EventType eventType : EventType.values()) {
-                if (perksMap.containsKey(eventType)) {
-                    List<CompoundTag> currentPerks = perksMap.get(eventType);
-                    currentPerks.removeIf(tag -> {
-                        for (CompoundTag removedTag : PerksEventJS.removedPerks) {
-                            if (arePerksEqual(tag, removedTag)) {
-                                ConsoleJS.SERVER.info("Removing perk: " + removedTag.getString("perk") +
-                                        " for skill: " + removedTag.getString("skill") +
-                                        " from event: " + eventType.name());
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-                }
+                List<CompoundTag> perksList = perksMap.getOrDefault(eventType, Collections.emptyList());
+                perksList.removeIf(tag -> {
+                    boolean matches = tag.getString("perk").equals(perkType);
+                    if (matches) {
+                        ConsoleJS.SERVER.info("Removing perk type: " + perkType +
+                                " for skill: " + tag.getString("skill") +
+                                " from event: " + eventType.name());
+                    }
+                    return matches;
+                });
             }
+        }
 
-            for (Map.Entry<EventType, List<CompoundTag>> entry : PerksEventJS.customPerks.entrySet()) {
-                EventType eventType = entry.getKey();
-                List<CompoundTag> perksToAdd = entry.getValue();
-                if (!perksToAdd.isEmpty()) {
-                    if (!perksMap.containsKey(eventType)) {
-                        perksMap.put(eventType, new ArrayList<>());
+        for (EventType eventType : EventType.values()) {
+            List<CompoundTag> currentPerks = perksMap.getOrDefault(eventType, Collections.emptyList());
+            currentPerks.removeIf(tag -> {
+                for (CompoundTag removedTag : PerksEventJS.removedPerks) {
+                    if (arePerksEqual(tag, removedTag)) {
+                        ConsoleJS.SERVER.info("Removing perk: " + removedTag.getString("perk") +
+                                " for skill: " + removedTag.getString("skill") +
+                                " from event: " + eventType.name());
+                        return true;
                     }
-                    List<CompoundTag> existingPerks = perksMap.get(eventType);
+                }
+                return false;
+            });
+        }
 
-                    for (CompoundTag newPerk : perksToAdd) {
-                        existingPerks.add(newPerk.copy());
-                        ConsoleJS.SERVER.info("Adding perk: " + newPerk.getString("perk") +
-                                " for skill: " + newPerk.getString("skill") +
-                                " to event: " + eventType.name());
-                    }
+        for (Map.Entry<EventType, List<CompoundTag>> entry : PerksEventJS.customPerks.entrySet()) {
+            EventType eventType = entry.getKey();
+            List<CompoundTag> perksToAdd = entry.getValue();
+            if (!perksToAdd.isEmpty()) {
+                List<CompoundTag> existingPerks = perksMap.computeIfAbsent(eventType, key -> new ArrayList<>());
+                for (CompoundTag newPerk : perksToAdd) {
+                    existingPerks.add(newPerk.copy());
+                    ConsoleJS.SERVER.info("Adding perk: " + newPerk.getString("perk") +
+                            " for skill: " + newPerk.getString("skill") +
+                            " to event: " + eventType.name());
                 }
             }
         }
+
+        setConfigObject(PerksConfig.PERK_SETTINGS, perksMap);
     }
 
     private static boolean arePerksEqual(CompoundTag tag1, CompoundTag tag2) {
@@ -191,8 +183,7 @@ public class DataManager {
         }
 
         if (!ServerEventJS.skillModifiers.isEmpty()) {
-            Map<String, Double> skillMods = Config.SKILL_MODIFIERS.get();
-            skillMods.putAll(ServerEventJS.skillModifiers);
+            mergeMapConfig(Config.SKILL_MODIFIERS, ServerEventJS.skillModifiers, Collections.emptyList());
         }
 
         if (ServerEventJS.linearBaseXp != null) {
@@ -228,82 +219,63 @@ public class DataManager {
         }
 
         if (!ServerEventJS.dealDamageXp.isEmpty()) {
-            Map<String, Map<String, Long>> dealDamageXp = Config.DEAL_DAMAGE_XP.get();
-            for (Map.Entry<String, Map<String, Long>> entry : ServerEventJS.dealDamageXp.entrySet()) {
-                dealDamageXp.computeIfAbsent(entry.getKey(), k -> new HashMap<>()).putAll(entry.getValue());
-            }
+            mergeNestedMapConfig(Config.DEAL_DAMAGE_XP, ServerEventJS.dealDamageXp);
         }
 
         if (!ServerEventJS.receiveDamageXp.isEmpty()) {
-            Map<String, Map<String, Long>> receiveDamageXp = Config.RECEIVE_DAMAGE_XP.get();
-            for (Map.Entry<String, Map<String, Long>> entry : ServerEventJS.receiveDamageXp.entrySet()) {
-                receiveDamageXp.computeIfAbsent(entry.getKey(), k -> new HashMap<>()).putAll(entry.getValue());
-            }
+            mergeNestedMapConfig(Config.RECEIVE_DAMAGE_XP, ServerEventJS.receiveDamageXp);
         }
 
         if (!ServerEventJS.jumpXp.isEmpty()) {
-            Map<String, Double> jumpXp = Config.JUMP_XP.get();
-            jumpXp.putAll(ServerEventJS.jumpXp);
+            mergeMapConfig(Config.JUMP_XP, ServerEventJS.jumpXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.sprintJumpXp.isEmpty()) {
-            Map<String, Double> sprintJumpXp = Config.SPRINT_JUMP_XP.get();
-            sprintJumpXp.putAll(ServerEventJS.sprintJumpXp);
+            mergeMapConfig(Config.SPRINT_JUMP_XP, ServerEventJS.sprintJumpXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.crouchJumpXp.isEmpty()) {
-            Map<String, Double> crouchJumpXp = Config.CROUCH_JUMP_XP.get();
-            crouchJumpXp.putAll(ServerEventJS.crouchJumpXp);
+            mergeMapConfig(Config.CROUCH_JUMP_XP, ServerEventJS.crouchJumpXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.breathChangeXp.isEmpty()) {
-            Map<String, Double> breathChangeXp = Config.BREATH_CHANGE_XP.get();
-            breathChangeXp.putAll(ServerEventJS.breathChangeXp);
+            mergeMapConfig(Config.BREATH_CHANGE_XP, ServerEventJS.breathChangeXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.healthChangeXp.isEmpty()) {
-            Map<String, Double> healthChangeXp = Config.HEALTH_CHANGE_XP.get();
-            healthChangeXp.putAll(ServerEventJS.healthChangeXp);
+            mergeMapConfig(Config.HEALTH_CHANGE_XP, ServerEventJS.healthChangeXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.healthIncreaseXp.isEmpty()) {
-            Map<String, Double> healthIncreaseXp = Config.HEALTH_INCREASE_XP.get();
-            healthIncreaseXp.putAll(ServerEventJS.healthIncreaseXp);
+            mergeMapConfig(Config.HEALTH_INCREASE_XP, ServerEventJS.healthIncreaseXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.healthDecreaseXp.isEmpty()) {
-            Map<String, Double> healthDecreaseXp = Config.HEALTH_DECREASE_XP.get();
-            healthDecreaseXp.putAll(ServerEventJS.healthDecreaseXp);
+            mergeMapConfig(Config.HEALTH_DECREASE_XP, ServerEventJS.healthDecreaseXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.sprintingXp.isEmpty()) {
-            Map<String, Double> sprintingXp = Config.SPRINTING_XP.get();
-            sprintingXp.putAll(ServerEventJS.sprintingXp);
+            mergeMapConfig(Config.SPRINTING_XP, ServerEventJS.sprintingXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.submergedXp.isEmpty()) {
-            Map<String, Double> submergedXp = Config.SUBMERGED_XP.get();
-            submergedXp.putAll(ServerEventJS.submergedXp);
+            mergeMapConfig(Config.SUBMERGED_XP, ServerEventJS.submergedXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.swimmingXp.isEmpty()) {
-            Map<String, Double> swimmingXp = Config.SWIMMING_XP.get();
-            swimmingXp.putAll(ServerEventJS.swimmingXp);
+            mergeMapConfig(Config.SWIMMING_XP, ServerEventJS.swimmingXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.divingXp.isEmpty()) {
-            Map<String, Double> divingXp = Config.DIVING_XP.get();
-            divingXp.putAll(ServerEventJS.divingXp);
+            mergeMapConfig(Config.DIVING_XP, ServerEventJS.divingXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.surfacingXp.isEmpty()) {
-            Map<String, Double> surfacingXp = Config.SURFACING_XP.get();
-            surfacingXp.putAll(ServerEventJS.surfacingXp);
+            mergeMapConfig(Config.SURFACING_XP, ServerEventJS.surfacingXp, Collections.emptyList());
         }
 
         if (!ServerEventJS.swimSprintingXp.isEmpty()) {
-            Map<String, Double> swimSprintingXp = Config.SWIM_SPRINTING_XP.get();
-            swimSprintingXp.putAll(ServerEventJS.swimSprintingXp);
+            mergeMapConfig(Config.SWIM_SPRINTING_XP, ServerEventJS.swimSprintingXp, Collections.emptyList());
         }
 
         if (ServerEventJS.partyRange != null) {
@@ -311,8 +283,7 @@ public class DataManager {
         }
 
         if (!ServerEventJS.partyBonus.isEmpty()) {
-            Map<String, Double> partyBonus = Config.PARTY_BONUS.get();
-            partyBonus.putAll(ServerEventJS.partyBonus);
+            mergeMapConfig(Config.PARTY_BONUS, ServerEventJS.partyBonus, Collections.emptyList());
         }
 
         if (ServerEventJS.mobScalingEnabled != null) {
@@ -348,10 +319,7 @@ public class DataManager {
         }
 
         if (!ServerEventJS.mobScaling.isEmpty()) {
-            Map<ResourceLocation, Map<String, Double>> mobScaling = Config.MOB_SCALING.get();
-            for (Map.Entry<ResourceLocation, Map<String, Double>> entry : ServerEventJS.mobScaling.entrySet()) {
-                mobScaling.computeIfAbsent(entry.getKey(), k -> new HashMap<>()).putAll(entry.getValue());
-            }
+            mergeNestedMapConfig(Config.MOB_SCALING, ServerEventJS.mobScaling);
         }
 
         if (ServerEventJS.veinEnabled != null) {
@@ -389,326 +357,101 @@ public class DataManager {
         Map<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> itemXpAwards = AutoValueConfigAccessor.getItemXpAwards();
         for (Map.Entry<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entry : itemXpAwards.entrySet()) {
             EventType eventType = entry.getKey();
-            Map<String, Long> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customItemXpAwards.containsKey(eventType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customItemXpAwards.get(eventType));
-                } else {
-                    Map<String, Long> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customItemXpAwards.get(eventType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Long> finalMap = (Map<String, Long>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
-
-            for (String skill : AutoValueEventJS.removedItemXpSkills.getOrDefault(eventType, Collections.emptyList())) {
-                defaultValues.remove(skill);
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customItemXpAwards.getOrDefault(eventType, Collections.emptyMap()),
+                    AutoValueEventJS.removedItemXpSkills.getOrDefault(eventType, Collections.emptyList()));
         }
 
         Map<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> blockXpAwards = AutoValueConfigAccessor.getBlockXpAwards();
         for (Map.Entry<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entry : blockXpAwards.entrySet()) {
             EventType eventType = entry.getKey();
-            Map<String, Long> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customBlockXpAwards.containsKey(eventType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customBlockXpAwards.get(eventType));
-                } else {
-                    Map<String, Long> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customBlockXpAwards.get(eventType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Long> finalMap = (Map<String, Long>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
-
-            for (String skill : AutoValueEventJS.removedBlockXpSkills.getOrDefault(eventType, Collections.emptyList())) {
-                defaultValues.remove(skill);
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customBlockXpAwards.getOrDefault(eventType, Collections.emptyMap()),
+                    AutoValueEventJS.removedBlockXpSkills.getOrDefault(eventType, Collections.emptyList()));
         }
 
         Map<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entityXpAwards = AutoValueConfigAccessor.getEntityXpAwards();
         for (Map.Entry<EventType, TomlConfigHelper.ConfigObject<Map<String, Long>>> entry : entityXpAwards.entrySet()) {
             EventType eventType = entry.getKey();
-            Map<String, Long> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customEntityXpAwards.containsKey(eventType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customEntityXpAwards.get(eventType));
-                } else {
-                    Map<String, Long> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customEntityXpAwards.get(eventType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Long> finalMap = (Map<String, Long>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
-
-            for (String skill : AutoValueEventJS.removedEntityXpSkills.getOrDefault(eventType, Collections.emptyList())) {
-                defaultValues.remove(skill);
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customEntityXpAwards.getOrDefault(eventType, Collections.emptyMap()),
+                    AutoValueEventJS.removedEntityXpSkills.getOrDefault(eventType, Collections.emptyList()));
         }
 
-        if (AutoValueEventJS.customAxeOverride != null) {
-            Map<String, Long> axeValues = AutoValueConfig.AXE_OVERRIDE.get();
-            if (axeValues instanceof HashMap) {
-                axeValues.clear();
-                axeValues.putAll(AutoValueEventJS.customAxeOverride);
-            } else {
-                Map<String, Long> newValues = new HashMap<>(AutoValueEventJS.customAxeOverride);
-                if (AutoValueConfig.AXE_OVERRIDE instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Long> finalMap = (Map<String, Long>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customAxeOverride.isEmpty()) {
+            setConfigObject(AutoValueConfig.AXE_OVERRIDE, copyMap(AutoValueEventJS.customAxeOverride));
         }
 
-        if (AutoValueEventJS.customHoeOverride != null) {
-            Map<String, Long> hoeValues = AutoValueConfig.HOE_OVERRIDE.get();
-            if (hoeValues instanceof HashMap) {
-                hoeValues.clear();
-                hoeValues.putAll(AutoValueEventJS.customHoeOverride);
-            } else {
-                Map<String, Long> newValues = new HashMap<>(AutoValueEventJS.customHoeOverride);
-                if (AutoValueConfig.HOE_OVERRIDE instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Long> finalMap = (Map<String, Long>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customHoeOverride.isEmpty()) {
+            setConfigObject(AutoValueConfig.HOE_OVERRIDE, copyMap(AutoValueEventJS.customHoeOverride));
         }
 
-        if (AutoValueEventJS.customShovelOverride != null) {
-            Map<String, Long> shovelValues = AutoValueConfig.SHOVEL_OVERRIDE.get();
-            if (shovelValues instanceof HashMap) {
-                shovelValues.clear();
-                shovelValues.putAll(AutoValueEventJS.customShovelOverride);
-            } else {
-                Map<String, Long> newValues = new HashMap<>(AutoValueEventJS.customShovelOverride);
-                if (AutoValueConfig.SHOVEL_OVERRIDE instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Long> finalMap = (Map<String, Long>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customShovelOverride.isEmpty()) {
+            setConfigObject(AutoValueConfig.SHOVEL_OVERRIDE, copyMap(AutoValueEventJS.customShovelOverride));
         }
 
-        if (AutoValueEventJS.customBrewablesOverride != null) {
-            Map<String, Long> brewValues = AutoValueConfig.BREWABLES_OVERRIDE.get();
-            if (brewValues instanceof HashMap) {
-                brewValues.clear();
-                brewValues.putAll(AutoValueEventJS.customBrewablesOverride);
-            } else {
-                Map<String, Long> newValues = new HashMap<>(AutoValueEventJS.customBrewablesOverride);
-                if (AutoValueConfig.BREWABLES_OVERRIDE instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Long> finalMap = (Map<String, Long>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customBrewablesOverride.isEmpty()) {
+            setConfigObject(AutoValueConfig.BREWABLES_OVERRIDE, copyMap(AutoValueEventJS.customBrewablesOverride));
         }
 
-        if (AutoValueEventJS.customSmeltablesOverride != null) {
-            Map<String, Long> smeltValues = AutoValueConfig.SMELTABLES_OVERRIDE.get();
-            if (smeltValues instanceof HashMap) {
-                smeltValues.clear();
-                smeltValues.putAll(AutoValueEventJS.customSmeltablesOverride);
-            } else {
-                Map<String, Long> newValues = new HashMap<>(AutoValueEventJS.customSmeltablesOverride);
-                if (AutoValueConfig.SMELTABLES_OVERRIDE instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Long> finalMap = (Map<String, Long>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customSmeltablesOverride.isEmpty()) {
+            setConfigObject(AutoValueConfig.SMELTABLES_OVERRIDE, copyMap(AutoValueEventJS.customSmeltablesOverride));
         }
 
         Map<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> itemReqs = AutoValueConfigAccessor.getItemReqs();
         for (Map.Entry<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> entry : itemReqs.entrySet()) {
             ReqType reqType = entry.getKey();
-            Map<String, Integer> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customItemReqs.containsKey(reqType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customItemReqs.get(reqType));
-                } else {
-                    Map<String, Integer> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customItemReqs.get(reqType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Integer> finalMap = (Map<String, Integer>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
-
-            for (String skill : AutoValueEventJS.removedItemReqSkills.getOrDefault(reqType, Collections.emptyList())) {
-                defaultValues.remove(skill);
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customItemReqs.getOrDefault(reqType, Collections.emptyMap()),
+                    AutoValueEventJS.removedItemReqSkills.getOrDefault(reqType, Collections.emptyList()));
         }
 
         Map<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> blockReqs = AutoValueConfigAccessor.getBlockReqs();
         for (Map.Entry<ReqType, TomlConfigHelper.ConfigObject<Map<String, Integer>>> entry : blockReqs.entrySet()) {
             ReqType reqType = entry.getKey();
-            Map<String, Integer> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customBlockReqs.containsKey(reqType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customBlockReqs.get(reqType));
-                } else {
-                    Map<String, Integer> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customBlockReqs.get(reqType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Integer> finalMap = (Map<String, Integer>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
-
-            for (String skill : AutoValueEventJS.removedBlockReqSkills.getOrDefault(reqType, Collections.emptyList())) {
-                defaultValues.remove(skill);
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customBlockReqs.getOrDefault(reqType, Collections.emptyMap()),
+                    AutoValueEventJS.removedBlockReqSkills.getOrDefault(reqType, Collections.emptyList()));
         }
 
-        if (AutoValueEventJS.customAxeToolOverride != null) {
-            Map<String, Integer> axeValues = AutoValueConfigAccessor.getAxeToolOverride().get();
-            if (axeValues instanceof HashMap) {
-                axeValues.clear();
-                axeValues.putAll(AutoValueEventJS.customAxeToolOverride);
-            } else {
-                Map<String, Integer> newValues = new HashMap<>(AutoValueEventJS.customAxeToolOverride);
-                if (AutoValueConfigAccessor.getAxeToolOverride() instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Integer> finalMap = (Map<String, Integer>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customAxeToolOverride.isEmpty()) {
+            setConfigObject(AutoValueConfigAccessor.getAxeToolOverride(), copyMap(AutoValueEventJS.customAxeToolOverride));
         }
 
-        if (AutoValueEventJS.customShovelToolOverride != null) {
-            Map<String, Integer> shovelValues = AutoValueConfigAccessor.getShovelToolOverride().get();
-            if (shovelValues instanceof HashMap) {
-                shovelValues.clear();
-                shovelValues.putAll(AutoValueEventJS.customShovelToolOverride);
-            } else {
-                Map<String, Integer> newValues = new HashMap<>(AutoValueEventJS.customShovelToolOverride);
-                if (AutoValueConfigAccessor.getShovelToolOverride() instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Integer> finalMap = (Map<String, Integer>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customShovelToolOverride.isEmpty()) {
+            setConfigObject(AutoValueConfigAccessor.getShovelToolOverride(), copyMap(AutoValueEventJS.customShovelToolOverride));
         }
 
-        if (AutoValueEventJS.customHoeToolOverride != null) {
-            Map<String, Integer> hoeValues = AutoValueConfigAccessor.getHoeToolOverride().get();
-            if (hoeValues instanceof HashMap) {
-                hoeValues.clear();
-                hoeValues.putAll(AutoValueEventJS.customHoeToolOverride);
-            } else {
-                Map<String, Integer> newValues = new HashMap<>(AutoValueEventJS.customHoeToolOverride);
-                if (AutoValueConfigAccessor.getHoeToolOverride() instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Integer> finalMap = (Map<String, Integer>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customHoeToolOverride.isEmpty()) {
+            setConfigObject(AutoValueConfigAccessor.getHoeToolOverride(), copyMap(AutoValueEventJS.customHoeToolOverride));
         }
 
-        if (AutoValueEventJS.customSwordToolOverride != null) {
-            Map<String, Integer> swordValues = AutoValueConfigAccessor.getSwordToolOverride().get();
-            if (swordValues instanceof HashMap) {
-                swordValues.clear();
-                swordValues.putAll(AutoValueEventJS.customSwordToolOverride);
-            } else {
-                Map<String, Integer> newValues = new HashMap<>(AutoValueEventJS.customSwordToolOverride);
-                if (AutoValueConfigAccessor.getSwordToolOverride() instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Integer> finalMap = (Map<String, Integer>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customSwordToolOverride.isEmpty()) {
+            setConfigObject(AutoValueConfigAccessor.getSwordToolOverride(), copyMap(AutoValueEventJS.customSwordToolOverride));
         }
 
-        if (AutoValueEventJS.customItemPenalties != null) {
-            Map<ResourceLocation, Integer> penalties = AutoValueConfig.ITEM_PENALTIES.get();
-            if (penalties instanceof HashMap) {
-                penalties.clear();
-                penalties.putAll(AutoValueEventJS.customItemPenalties);
-            } else {
-                Map<ResourceLocation, Integer> newValues = new HashMap<>(AutoValueEventJS.customItemPenalties);
-                if (AutoValueConfig.ITEM_PENALTIES instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<ResourceLocation, Integer> finalMap = (Map<ResourceLocation, Integer>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customItemPenalties.isEmpty()) {
+            setConfigObject(AutoValueConfig.ITEM_PENALTIES, copyMap(AutoValueEventJS.customItemPenalties));
         }
 
         Map<AutoValueConfig.UtensilTypes, TomlConfigHelper.ConfigObject<Map<String, Double>>> utensilAttributes = AutoValueConfigAccessor.getUtensilAttributes();
         for (Map.Entry<AutoValueConfig.UtensilTypes, TomlConfigHelper.ConfigObject<Map<String, Double>>> entry : utensilAttributes.entrySet()) {
             AutoValueConfig.UtensilTypes utensilType = entry.getKey();
-            Map<String, Double> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customUtensilAttributes.containsKey(utensilType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customUtensilAttributes.get(utensilType));
-                } else {
-                    Map<String, Double> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customUtensilAttributes.get(utensilType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Double> finalMap = (Map<String, Double>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customUtensilAttributes.getOrDefault(utensilType, Collections.emptyMap()),
+                    Collections.emptyList());
         }
 
         Map<AutoValueConfig.WearableTypes, TomlConfigHelper.ConfigObject<Map<String, Double>>> wearableAttributes = AutoValueConfigAccessor.getWearableAttributes();
         for (Map.Entry<AutoValueConfig.WearableTypes, TomlConfigHelper.ConfigObject<Map<String, Double>>> entry : wearableAttributes.entrySet()) {
             AutoValueConfig.WearableTypes wearableType = entry.getKey();
-            Map<String, Double> defaultValues = entry.getValue().get();
-
-            if (AutoValueEventJS.customWearableAttributes.containsKey(wearableType)) {
-                if (defaultValues instanceof HashMap) {
-                    defaultValues.putAll(AutoValueEventJS.customWearableAttributes.get(wearableType));
-                } else {
-                    Map<String, Double> newValues = new HashMap<>(defaultValues);
-                    newValues.putAll(AutoValueEventJS.customWearableAttributes.get(wearableType));
-                    if (entry.getValue() instanceof Map<?,?> map) {
-                        map.clear();
-                        Map<String, Double> finalMap = (Map<String, Double>) map;
-                        finalMap.putAll(newValues);
-                    }
-                }
-            }
+            mergeMapConfig(entry.getValue(),
+                    AutoValueEventJS.customWearableAttributes.getOrDefault(wearableType, Collections.emptyMap()),
+                    Collections.emptyList());
         }
 
-        if (AutoValueEventJS.customEntityAttributes != null) {
-            Map<String, Double> entityAttrs = AutoValueConfig.ENTITY_ATTRIBUTES.get();
-            if (entityAttrs instanceof HashMap) {
-                entityAttrs.clear();
-                entityAttrs.putAll(AutoValueEventJS.customEntityAttributes);
-            } else {
-                Map<String, Double> newValues = new HashMap<>(AutoValueEventJS.customEntityAttributes);
-                if (AutoValueConfig.ENTITY_ATTRIBUTES instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, Double> finalMap = (Map<String, Double>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+        if (!AutoValueEventJS.customEntityAttributes.isEmpty()) {
+            setConfigObject(AutoValueConfig.ENTITY_ATTRIBUTES, copyMap(AutoValueEventJS.customEntityAttributes));
         }
 
         if (AutoValueEventJS.customRaritiesModifier != null) {
@@ -726,43 +469,8 @@ public class DataManager {
 
     private static void updateGlobalsConfig() {
         PMMOKubeJSEvents.GLOBALS_CONFIG.post(new GlobalsEventJS());
-
-        Map<String, String> paths = GlobalsConfig.PATHS.get();
-        for (String key : GlobalsEventJS.removedPaths.keySet()) {
-            paths.remove(key);
-        }
-        if (!GlobalsEventJS.customPaths.isEmpty()) {
-            if (paths instanceof HashMap) {
-                paths.putAll(GlobalsEventJS.customPaths);
-            } else {
-                Map<String, String> newValues = new HashMap<>(paths);
-                newValues.putAll(GlobalsEventJS.customPaths);
-                if (GlobalsConfig.PATHS instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, String> finalMap = (Map<String, String>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
-        }
-
-        Map<String, String> constants = GlobalsConfig.CONSTANTS.get();
-        for (String key : GlobalsEventJS.removedConstants.keySet()) {
-            constants.remove(key);
-        }
-
-        if (!GlobalsEventJS.customConstants.isEmpty()) {
-            if (constants instanceof HashMap) {
-                constants.putAll(GlobalsEventJS.customConstants);
-            } else {
-                Map<String, String> newValues = new HashMap<>(constants);
-                newValues.putAll(GlobalsEventJS.customConstants);
-                if (GlobalsConfig.CONSTANTS instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<String, String> finalMap = (Map<String, String>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
-        }
+        mergeMapConfig(GlobalsConfig.PATHS, GlobalsEventJS.customPaths, GlobalsEventJS.removedPaths.keySet());
+        mergeMapConfig(GlobalsConfig.CONSTANTS, GlobalsEventJS.customConstants, GlobalsEventJS.removedConstants.keySet());
     }
 
     private static void updateAntiCheeseConfig() {
@@ -772,67 +480,77 @@ public class DataManager {
             AntiCheeseConfig.AFK_CAN_SUBTRACT.set(AntiCheeseEventJS.afkCanSubtract);
         }
 
-        Map<EventType, CheeseTracker.Setting> afkSettings = AntiCheeseConfig.SETTINGS_AFK.get();
-        for (EventType eventType : AntiCheeseEventJS.removedAfkSettings.keySet()) {
-            if (AntiCheeseEventJS.removedAfkSettings.get(eventType)) {
-                afkSettings.remove(eventType);
-            }
-        }
+        mergeMapConfig(AntiCheeseConfig.SETTINGS_AFK,
+                AntiCheeseEventJS.customAfkSettings,
+                keysMarkedForRemoval(AntiCheeseEventJS.removedAfkSettings));
 
-        if (!AntiCheeseEventJS.customAfkSettings.isEmpty()) {
-            if (afkSettings instanceof HashMap) {
-                afkSettings.putAll(AntiCheeseEventJS.customAfkSettings);
-            } else {
-                Map<EventType, CheeseTracker.Setting> newValues = new HashMap<>(afkSettings);
-                newValues.putAll(AntiCheeseEventJS.customAfkSettings);
-                if (AntiCheeseConfig.SETTINGS_AFK instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<EventType, CheeseTracker.Setting> finalMap = (Map<EventType, CheeseTracker.Setting>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
-        }
+        mergeMapConfig(AntiCheeseConfig.SETTINGS_DIMINISHING,
+                AntiCheeseEventJS.customDiminishingSettings,
+                keysMarkedForRemoval(AntiCheeseEventJS.removedDiminishingSettings));
 
-        Map<EventType, CheeseTracker.Setting> diminishingSettings = AntiCheeseConfig.SETTINGS_DIMINISHING.get();
-        for (EventType eventType : AntiCheeseEventJS.removedDiminishingSettings.keySet()) {
-            if (AntiCheeseEventJS.removedDiminishingSettings.get(eventType)) {
-                diminishingSettings.remove(eventType);
-            }
-        }
+        mergeMapConfig(AntiCheeseConfig.SETTINGS_NORMALIZED,
+                AntiCheeseEventJS.customNormalizationSettings,
+                keysMarkedForRemoval(AntiCheeseEventJS.removedNormalizationSettings));
+    }
 
-        if (!AntiCheeseEventJS.customDiminishingSettings.isEmpty()) {
-            if (diminishingSettings instanceof HashMap) {
-                diminishingSettings.putAll(AntiCheeseEventJS.customDiminishingSettings);
-            } else {
-                Map<EventType, CheeseTracker.Setting> newValues = new HashMap<>(diminishingSettings);
-                newValues.putAll(AntiCheeseEventJS.customDiminishingSettings);
-                if (AntiCheeseConfig.SETTINGS_DIMINISHING instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<EventType, CheeseTracker.Setting> finalMap = (Map<EventType, CheeseTracker.Setting>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
-        }
+    private static <K, V> LinkedHashMap<K, V> copyMap(Map<K, V> source) {
+        return source == null ? new LinkedHashMap<>() : new LinkedHashMap<>(source);
+    }
 
-        Map<EventType, CheeseTracker.Setting> normalizationSettings = AntiCheeseConfig.SETTINGS_NORMALIZED.get();
-        for (EventType eventType : AntiCheeseEventJS.removedNormalizationSettings.keySet()) {
-            if (AntiCheeseEventJS.removedNormalizationSettings.get(eventType)) {
-                normalizationSettings.remove(eventType);
+    private static Map<EventType, List<CompoundTag>> copyPerkSettings(Map<EventType, List<CompoundTag>> source) {
+        Map<EventType, List<CompoundTag>> copy = new LinkedHashMap<>();
+        source.forEach((eventType, perks) -> {
+            List<CompoundTag> perkCopies = new ArrayList<>();
+            for (CompoundTag perk : perks) {
+                perkCopies.add(perk.copy());
             }
-        }
+            copy.put(eventType, perkCopies);
+        });
+        return copy;
+    }
 
-        if (!AntiCheeseEventJS.customNormalizationSettings.isEmpty()) {
-            if (normalizationSettings instanceof HashMap) {
-                normalizationSettings.putAll(AntiCheeseEventJS.customNormalizationSettings);
-            } else {
-                Map<EventType, CheeseTracker.Setting> newValues = new HashMap<>(normalizationSettings);
-                newValues.putAll(AntiCheeseEventJS.customNormalizationSettings);
-                if (AntiCheeseConfig.SETTINGS_NORMALIZED instanceof Map<?,?> map) {
-                    map.clear();
-                    Map<EventType, CheeseTracker.Setting> finalMap = (Map<EventType, CheeseTracker.Setting>) map;
-                    finalMap.putAll(newValues);
-                }
-            }
+    private static <K, V> void mergeMapConfig(TomlConfigHelper.ConfigObject<Map<K, V>> config,
+                                              Map<K, V> additions,
+                                              Collection<K> removals) {
+        Map<K, V> updatedValues = copyMap(config.get());
+        if (removals != null) {
+            removals.forEach(updatedValues::remove);
         }
+        if (additions != null && !additions.isEmpty()) {
+            updatedValues.putAll(additions);
+        }
+        setConfigObject(config, updatedValues);
+    }
+
+    private static <K, N, V> void mergeNestedMapConfig(TomlConfigHelper.ConfigObject<Map<K, Map<N, V>>> config,
+                                                       Map<K, Map<N, V>> additions) {
+        Map<K, Map<N, V>> updatedValues = new LinkedHashMap<>();
+        config.get().forEach((key, value) -> updatedValues.put(key, copyMap(value)));
+        additions.forEach((key, value) -> updatedValues
+                .computeIfAbsent(key, ignored -> new LinkedHashMap<>())
+                .putAll(value));
+        setConfigObject(config, updatedValues);
+    }
+
+    private static <K> List<K> keysMarkedForRemoval(Map<K, Boolean> removalMap) {
+        List<K> keys = new ArrayList<>();
+        removalMap.forEach((key, remove) -> {
+            if (Boolean.TRUE.equals(remove)) {
+                keys.add(key);
+            }
+        });
+        return keys;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> void setConfigObject(TomlConfigHelper.ConfigObject<T> config, T updatedValue) {
+        ConfigObjectAccessor<T> accessor = (ConfigObjectAccessor<T>) config;
+        Object encodedValue = accessor.pmmojs$getCodec()
+                .encodeStart(TomlConfigHelper.TomlConfigOps.INSTANCE, updatedValue)
+                .resultOrPartial(message -> ConsoleJS.SERVER.error("Failed to encode PMMO config object: " + message))
+                .orElseThrow(() -> new IllegalStateException("Failed to encode PMMO config object"));
+        accessor.pmmojs$getValue().set(encodedValue);
+        accessor.pmmojs$setCachedObject(encodedValue);
+        accessor.pmmojs$setParsedObject(updatedValue);
     }
 }

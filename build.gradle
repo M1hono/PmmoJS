@@ -4,7 +4,6 @@ buildscript {
         maven { url = 'https://maven.minecraftforge.net' }
         maven { url = 'https://maven.architectury.dev/' }
         maven { url = 'https://maven.fabricmc.net/' }
-        maven { url = "https://maven.neoforged.net/releases/" }
         mavenCentral()
     }
     dependencies {
@@ -97,15 +96,16 @@ repositories {
     }
 
     maven {
-        name "neoforgedReleases"
-        url "https://maven.neoforged.net/releases"
+        name = "MinecraftForge"
+        url "https://maven.minecraftforge.net/"
     }
 
     maven {
         name = "Lat's Maven"
-        url = "https://maven.saps.dev/minecraft"
+        url = "https://maven.latvian.dev/releases"
         content {
             includeGroup "dev.latvian.mods"
+            includeGroup "dev.latvian.apps"
         }
     }
 
@@ -115,6 +115,10 @@ repositories {
         content {
             includeGroup "curse.maven"
         }
+    }
+    maven {
+        name = "Mihono's maven"
+        url = "https://maven.mihono.cn/repository/pickaid1201/"
     }
 
     maven {
@@ -162,14 +166,12 @@ dependencies {
         officialMojangMappings()
         parchment("org.parchmentmc.data:parchment-1.20.1:2023.09.03@zip")
     }
-//    forge "net.minecraftforge:forge:${config.mc_version}-${config.forge_version}"
-    forge("net.neoforged:forge:${config.mc_version}-${config.forge_version}")
+    forge("net.minecraftforge:forge:${config.mc_version}-${config.forge_version}")
     // KubeJS dependencies
     modImplementation("dev.latvian.mods:kubejs-forge:${config.kubejs_version}")
+    modCompileOnly("dev.latvian.mods:rhino-forge:${config.rhino_version}")
     modRuntimeOnly("dev.latvian.mods:rhino-forge:${config.rhino_version}")
     modRuntimeOnly("dev.architectury:architectury-forge:${config.architectury_version}")
-    modRuntimeOnly("curse.maven:probejs-585406:5227399")
-    modRuntimeOnly ("curse.maven:jei-238222:6075247")
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
@@ -197,9 +199,18 @@ dependencies {
         modRuntimeOnly("io.github.kosmx.bendy-lib:bendy-lib-forge:${config.bendylib_version}")
     }
 
-    modImplementation("curse.maven:project-mmo-353935:6507111")
-    modRuntimeOnly "curse.maven:yacl-667299:5103178"
-    modCompileOnly "curse.maven:yacl-667299:5103178"
+    if (hasConfig("pibrary_version") && !config.pibrary_version.isEmpty()) {
+        modImplementation("com.mihono.pickaid:pibrary:${config.pibrary_version}")
+    }
+
+    if (hasConfig("pikubejscompat_version") && !config.pikubejscompat_version.isEmpty()) {
+        modImplementation("com.mihono.pickaid:pikubejscompat:${config.pikubejscompat_version}")
+    }
+
+    // Test-only recipe viewer runtime for reproducing EMI sync/indexing regressions locally.
+    modRuntimeOnly("curse.maven:emi-580555:6420945")
+    modCompileOnly("curse.maven:probejs-585406:5227399")
+    modRuntimeOnly("curse.maven:probejs-585406:5227399")
 //    modCompileOnly("curse.maven:configured-457570:5180900")
 //    modRuntimeOnly("curse.maven:configured-457570:5180900")
 
@@ -260,6 +271,9 @@ dependencies {
         }
     } else libDir.mkdir()
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    testImplementation(platform("org.junit:junit-bom:5.10.2"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
 processResources {
@@ -350,6 +364,11 @@ publishing {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
 kotlin {
     jvmToolchain(17)
 }

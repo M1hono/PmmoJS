@@ -1,0 +1,96 @@
+---
+title: 启动注册
+hide_meta: true
+---
+
+# 启动注册
+
+启动事件用于注册那些必须在运行期玩法逻辑开始前就存在的 PMMO 结构。
+
+`startup_scripts/` 适合放：
+
+- PMMO predicate
+- PMMO perk 类型注册
+- 直接 PMMO 注册数据
+- 启动期原生 Forge 事件监听
+
+`server_scripts/` 适合放：
+
+- `PmmoJS.trigger(...)`
+- `PmmoJS.internal(...)`
+- PMMO 配置事件
+- 命令逻辑
+- ProbeJS 文档生成
+
+## `PmmoJS.registerPredicate`
+
+用于注册 PMMO 在需求判定时调用的 predicate。
+
+可用方法：
+
+- `registerActionPredicate(resourceId, reqType, predicate)`
+- `registerBreakPredicate(resourceId, reqType, predicate)`
+- `registerEntityPredicate(resourceId, reqType, predicate)`
+
+每个 predicate 都会接收当前 `Player` 和对应的目标对象。
+
+```js
+PmmoJS.registerPredicate(event => {
+  event.registerActionPredicate(PmmoHelper.id('minecraft:stick'), ReqType.WEAPON, (player, stack) => {
+    return player.experienceLevel >= 5
+  })
+})
+```
+
+## `PmmoJS.registerPerk`
+
+用于在 `startup_scripts/` 中注册新的 PMMO perk 类型。
+
+- 这个事件用于定义新的 perk 类型
+- 如果只是修改已有 perk 配置，请使用 `PmmoJS.perksConfig(...)`
+
+参考页面：
+
+- [Perk 注册](./perks)
+
+## 直接 PMMO 注册
+
+`PmmoHelper` 可以在 `startup_scripts/` 中直接使用。
+
+常用 helper：
+
+- `registerRequirementData`
+- `registerXpAwardData`
+- `registerDamageXpAwardData`
+- `registerBonusData`
+- `registerPositiveEffects`
+- `registerNegativeEffects`
+- `registerSalvageData`
+- `registerVeinData`
+- `registerTriggerListener`
+
+```js
+PmmoHelper.registerRequirementData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', ReqType.TOOL, {
+  mining: 10,
+  endurance: 4
+}, true)
+
+PmmoHelper.registerXpAwardData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', EventType.BLOCK_BREAK, {
+  mining: 8
+}, true)
+```
+
+## 原生 Forge 事件
+
+在核心 KubeJS `1.20.1` 中，`ForgeEvents.onEvent(...)` 属于 startup 脚本 API。
+
+```js
+ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent', event => {
+  console.info(`[PmmoJS] login forge event for ${event.getEntity().getScoreboardName()}`)
+})
+```
+
+## 相关页面
+
+- [阶段规则](./phases)
+- [Perk 注册](./perks)

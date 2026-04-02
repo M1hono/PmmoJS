@@ -1,141 +1,158 @@
 ---
-title: Functional Events
+title: Runtime Events
 hide_meta: true
 ---
 
-# Server Events
+# Runtime Events
 
-This section covers functional server events that trigger during gameplay actions.
+These hooks fire during gameplay and belong in `server_scripts/`.
 
-## XP Event
+## `PmmoJS.trigger`
 
-Triggered when a player gains or loses XP in a skill:
+Triggered from PMMO's internal `EventTriggerRegistry` for PMMO `EventType` handlers that actually route through the trigger registry.
+
+This is the broad hook that brings Project MMO's own gameplay logic into KubeJS without needing a custom wrapper for each handler class. Use it when you want block break, crafting, placement, damage, tame, trade, jump, swimming, and other PMMO trigger types through one event entrypoint.
+
+Verified PMMO `1.20.1-1.7.40` trigger families currently routed through this bridge include:
+
+- `ANVIL_REPAIR`, `BLOCK_BREAK`, `BREAK_SPEED`, `BLOCK_PLACE`, `BREED`, `BREW`, `CONSUME`, `CRAFT`
+- `DEAL_DAMAGE`, `RECEIVE_DAMAGE`, `DEATH`, `ENCHANT`, `ENTITY`, `FISH`, `GROW`
+- `HIT_BLOCK`, `ACTIVATE_BLOCK`, `ACTIVATE_ITEM`
+- `JUMP`, `SPRINT_JUMP`, `CROUCH_JUMP`
+- `GIVEN_AS_TRADE`, `RECEIVED_AS_TRADE`, `TAMING`, `SHIELD_BLOCK`
+- `BREATH_CHANGE`, `HEALTH_CHANGE`, `HEALTH_INCREASE`, `HEALTH_DECREASE`
+- `RIDING`, `EFFECT`, `SPRINTING`, `CROUCH`, `SUBMERGED`, `SWIMMING`, `DIVING`, `SURFACING`, `SWIM_SPRINTING`
+
+This does not mean every PMMO gameplay path lives in the trigger registry. PMMO still has handler families such as dimension travel, login, mount, piston, player death, explosion, and sleep that are not `EventType` trigger-registry paths. Those are exposed separately through `PmmoJS.internal`.
+
+```js
+PmmoJS.trigger(EventType.BLOCK_BREAK, (event) => {
+    const player = event.getPlayer()
+
+    if (player && player.stages.has("peaceful_mining")) {
+        event.addXpAward("mining", 25)
+    }
+
+    if (player && player.isCreative()) {
+        event.setCancelled(true)
+    }
+})
+```
+
+Useful members on `PMMOTriggerEventJS`:
+
+- `getType()` and `getTypeId()`
+- `getForgeEvent()` and `getForgeEventClassName()`
+- `hasPlayer()`, `getPlayer()`, and `getServerPlayer()`
+- `getContext()` plus `getContextBoolean`, `getContextString`, `putContextInt`, `putContextCompound`, and related context helpers
+- `getXpAwards()`, `setXpAwards()`, `setXpAward()`, and `addXpAward()`
+- `setCancelled(true)` to feed PMMO's internal `is_cancelled` flag back into the base mod
+
+<Callout variant="info">
+    Use `PmmoJS.trigger` for PMMO `EventType` gameplay hooks. Use
+    [`PmmoJS.internal`](./internal.mdx) when you need PMMO handler-specific logic
+    that never flowed through the trigger registry.
+</Callout>
+
+## `PmmoJS.xp`
+
+Triggered when PMMO changes XP for a player.
 
 ```js
 PmmoJS.xp((event) => {
-    const player = event.getEntity(); // get the player
-    const skill = event.getSkill(); // get the skill
-    const startLevel = event.startLevel(); // get the start level
-    const endLevel = event.endLevel(); // get the end level
-    const isLevelUp = event.isLevelUp(); // get if the player is level up
-    const context = event.getContext(); // get the context
+    const player = event.getEntity();
+    const skill = event.getSkill();
 
-    if (isLevelUp) {
-        // Reward players with diamond every 10 levels
-        if (endLevel % 10 === 0) {
-            player.give(Item.of("minecraft:diamond", 1));
-        }
-
-        // Special reward for reaching magic level 50
-        if (skill === "magic" && endLevel === 50) {
-            player.give(Item.of("minecraft:enchanted_book"));
-        }
+    if (event.isLevelUp() && event.endLevel() % 10 === 0) {
+        player.give(Item.of("minecraft:diamond"));
     }
 
-    // Block all mining XP gains
     if (skill === "mining") {
         event.cancel();
     }
-
-    // Check for experience source context
-    if (context.contains("source")) {
-        const source = context.getString("source");
-    }
 });
 ```
 
-## Enchant Event
+## `PmmoJS.enchant`
 
-Triggered when a player enchants an item:
+Triggered when a player enchants an item.
 
 ```js
 PmmoJS.enchant((event) => {
-    const player = event.getEntity(); // get the player
-    const enchantment = event.getEnchantmentInstance(); // get the enchantment instance
-    const stack = event.getStack(); // get the stack
-
-    // Only process high-level enchantments (III+)
-    if (enchantment.level >= 3) {
-        // Extract clean enchantment name from translation key
-        const enchantName = enchantment.enchantment
-            .getDescriptionId()
-            .replace("enchantment.minecraft.", "");
-
-        // Assign XP based on enchantment type
-        if (enchantName === "sharpness" || enchantName === "power") {
-            SKillHelper.addXP(player, "combat", 50 * enchantment.level) // Melee/ranged combat XP
-        } else if (enchantName === "efficiency" || enchantName === "fortune") {
-            SKillHelper.addXP(player, "mining", 50 * enchantment.level) // Mining/utility XP
-        } else {
-            SKillHelper.addXP(player, "magic", 30 * enchantment.level) // General magic XP
-        }
-    }
+    const ench = event.getEnchantmentInstance();
+    SkillHelper.addXP(event.getEntity(), "magic", 10 * ench.level);
 });
 ```
 
-## Furnace Event
+## `PmmoJS.furnace`
 
-Triggered when a furnace completes smelting:
+Triggered from PMMO's furnace burn event.
 
 ```js
 PmmoJS.furnace((event) => {
-    const level = event.getLevel(); // get the level
-    const pos = event.getPos(); // get the position
-    const input = event.getInput(); // get the input
-
-    // Check for players in 5 block radius around furnace
-    level
-        .getEntitiesWithin(
-            AABB.of(
-                pos.x - 5,
-                pos.y - 5,
-                pos.z - 5,
-                pos.x + 5,
-                pos.y + 5,
-                pos.z + 5
-            )
-        )
-        .filter((entity) => entity.isPlayer())
-        .forEach((player) => {
-            // Grant smithing XP for ore processing
-            if (input.item.id.includes("ore")) {
-                SKillHelper.addXP(player, "smiting", 10);
-            } 
-            // Grant cooking XP for food items
-            else if (input.getId().includes("food")
-                || input.item.getFoodProperties() != null
-                || input.is("#forge:food")) {
-                SKillHelper.addXP(player, "cooking", 10);
-            }
-        });
-});
-```
-
-## Salvage Event
-
-Triggered when a player salvages an item:
-
-```js
-PmmoJS.salvage((event) => {
-    const player = event.getEntity(); // get the player
-    const inputStack = event.getInputStack(); // get the input stack
-    const outputStack = event.getOutputStack(); // get the output stack
-    const salvageData = event.getSalvage(); // get the salvage data
-
-    const craftingLevel = SkillHelper.getLevel(player, "crafting")
-
-    // Special handling for apple salvage by high-level crafters
-    if (craftingLevel >= 50 && inputStack.item.id.equals("apple")) {
-        const salvageBuilder = event.getBuilder();
-        // Add combat requirement to salvage operation
-        salvageBuilder.setLevelReq({combat:1});
-        // Multiply output apples by 60
-        event.setOutputStack(Item.of("apple").withCount(60));
+    const input = event.getInput();
+    if (input.id === "minecraft:iron_ore") {
+        // custom logic here
     }
 });
 ```
 
+## `PmmoJS.salvage`
+
+Triggered when a player salvages an item.
+
+```js
+PmmoJS.salvage((event) => {
+    const builder = event.getBuilder();
+    builder.setSalvageMax(2);
+    event.setOutputStack(Item.of("minecraft:iron_nugget", 2));
+});
+```
+
+## Damage Penalty Hooks
+
+- `PmmoJS.itemstackDamagePenalty`
+- `PmmoJS.entityDamagePenalty`
+
+Use these to scale PMMO's damage penalty instead of only canceling it.
+
+```js
+PmmoJS.itemstackDamagePenalty((event) => {
+    event.setDamage(event.getDamage() * 0.75);
+});
+
+PmmoJS.entityDamagePenalty((event) => {
+    event.setDamage(event.getDamage() * 0.5);
+});
+```
+
+## `PmmoHelper`
+
+`PmmoHelper` is the preferred direct binding when you want PMMO API access without KubeJS overload ambiguity.
+
+Example:
+
+```js
+ServerEvents.loaded((event) => {
+    const player = event.server.getPlayerList().getPlayers()[0]
+    if (!player) return
+
+    console.log(PmmoHelper.getSkillLevel(player, "mining"))
+    console.log(PmmoHelper.getItemRequirements(player.mainHandItem, ReqType.WEAR))
+    console.log(PmmoHelper.getCurrentVeinCharge(player))
+})
+```
+
+High-value method groups:
+
+- skill state: `getSkillLevel`, `setSkillLevel`, `addSkillXp`, `getAllSkillLevels`
+- data lookups: `getItemXpAwards`, `getBlockRequirements`, `getConsolidatedModifiers`
+- direct registration: `registerRequirementData`, `registerXpAwardData`, `registerBonusData`, tooltip registrations, predicates
+- discovery helpers: `getTriggerTypeIds`, `getInternalTypeIds`
+- PMMO systems: `awardXpToPlayer`, `awardXpToPartyInRange`, `getPartyMembers`, `applyVeinMining`, `triggerSalvage`
+
 <Callout variant="info">
-    These events trigger in real-time during gameplay, allowing you to hook into
-    PMMO actions and modify their behavior or add custom features.
+    `PmmoHelper` is the broad helper surface for Project MMO internals. `SkillHelper`
+    still exists for older scripts and quick skill-only access. In `client_scripts`,
+    `SkillHelper` remains read-only and `PmmoHelper` is not exposed.
 </Callout>

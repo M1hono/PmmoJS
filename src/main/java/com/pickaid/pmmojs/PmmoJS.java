@@ -1,16 +1,16 @@
 package com.pickaid.pmmojs;
 
-import com.pickaid.pmmojs.config.PmmoJSConfigScreen;
+import com.pickaid.pmmojs.config.PmmoJSCommonConfig;
 import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
-import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
 import com.pickaid.pmmojs.kubejs.events.server.confg.SkillsEventJS;
+import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
+import com.pickaid.pmmojs.kubejs.events.startup.PredicateRegistryEventJS;
 import dev.latvian.mods.rhino.util.HideFromJS;
-import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,17 +27,18 @@ public class PmmoJS {
 
     public PmmoJS () {
         PMMOKubeJSEvents.SKILL_CONFIG.post(new SkillsEventJS());
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, PmmoJSCommonConfig.SPEC);
         FMLJavaModLoadingContext ctx = FMLJavaModLoadingContext.get();
         IEventBus modEventBus = ctx.getModEventBus();
         modEventBus.addListener(this::setUp);
     }
 
     public void setUp(FMLCommonSetupEvent event) {
-        PMMOKubeJSEvents.REGISTER_PREDICATE.post(new PerksRegistryEventJS());
+        PMMOKubeJSEvents.REGISTER_PREDICATE.post(new PredicateRegistryEventJS());
         PMMOKubeJSEvents.REGISTER_PERK.post(new PerksRegistryEventJS());
-        event.enqueueWork(PMMOKubeJSEvents::registerPerk);
-        if (ModList.get().isLoaded("yet_another_config_lib_v3")) {
-            ModLoadingContext.get().registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class, () -> new ConfigScreenHandler.ConfigScreenFactory((client, screen) -> PmmoJSConfigScreen.create(screen)));
-        }
+        event.enqueueWork(() -> {
+            PMMOKubeJSEvents.registerPerk();
+            PMMOKubeJSEvents.registerTriggerBridge();
+        });
     }
 }

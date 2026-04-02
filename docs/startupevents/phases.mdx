@@ -1,0 +1,110 @@
+---
+title: Startup Phase Rules
+hide_meta: true
+---
+
+# Startup Phase Rules
+
+This page answers one question:
+
+Which script phase should hold which kind of PmmoJS logic?
+
+## The short version
+
+For Forge `1.20.1` with KubeJS:
+
+- `startup_scripts/` is for registration and startup-only Forge hooks
+- `server_scripts/` is for PMMO runtime logic and ProbeJS generation
+- `client_scripts/` is for client-only helpers and UI-side logic
+
+## Practical routing
+
+Put this in `startup_scripts/`:
+
+- `PmmoJS.registerPredicate(...)`
+- `PmmoJS.registerPerk(...)`
+- `PmmoHelper.registerRequirementData(...)`
+- `PmmoHelper.registerXpAwardData(...)`
+- `PmmoHelper.registerTriggerListener(...)`
+- `ForgeEvents.onEvent(...)`
+
+Put this in `server_scripts/`:
+
+- `PmmoJS.trigger(...)`
+- `PmmoJS.internal(...)`
+- `PmmoJS.xp(...)`
+- PMMO config events such as `PmmoJS.skillsConfig(...)`
+- commands, test harnesses, and runtime logs
+- `ProbeJSEvents.generateDoc(...)`
+
+Put this in `client_scripts/`:
+
+- read-only skill display helpers
+- client-only UI logic
+
+For `PmmoJS.registerPerk(...)`, also read the startup registry page. The perk builder now uses context-based lifecycle callbacks, and the merge order for `ctx.getSettings()` is explained there in detail.
+
+## Why the split exists
+
+`startup_scripts/` runs for definitions that should exist before the playable server logic starts.
+
+`server_scripts/` runs for live server behavior. That is where runtime PMMO events belong because those scripts are meant to react to real gameplay and server reloads.
+
+This also explains the common trap:
+
+- `ForgeEvents.onEvent(...)` is startup-side on core KubeJS `1.20.1`
+- `ProbeJSEvents.generateDoc(...)` is server-side in this runtime
+
+They are not interchangeable even if both look like global event APIs.
+
+## Good startup examples
+
+```js
+PmmoJS.registerPredicate(event => {
+  event.registerActionPredicate(PmmoHelper.id('minecraft:stick'), ReqType.WEAPON, (player, stack) => {
+    return player.experienceLevel >= 5
+  })
+})
+
+PmmoHelper.registerXpAwardData(ObjectType.ITEM, 'minecraft:bread', EventType.CONSUME, {
+  cooking: 2
+}, true)
+
+ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent', event => {
+  console.info(`[PmmoJS] raw login mirror: ${event.getEntity().getScoreboardName()}`)
+})
+```
+
+## Good server examples
+
+```js
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  if (event.hasPlayer()) {
+    event.addXpAward('mining', 5)
+  }
+})
+
+PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
+  if (!event.getContextBoolean('alreadyTracked')) {
+    event.addXpAward('alchemy', 10)
+  }
+})
+
+ProbeJSEvents.generateDoc(event => {
+  event.addSnippet('pmmojs.trigger.type', PmmoHelper.getTriggerTypeIds(), 'PmmoJS trigger ids')
+})
+```
+
+## Reload expectations
+
+- Startup registrations are not the place for hot-reload gameplay iteration.
+- Server scripts are the place for reload-friendly PMMO runtime logic.
+- If you move a startup-only registration into `server_scripts/`, expect invalid-script-type errors or a wrong lifecycle.
+
+## Rule of thumb
+
+Ask what the code is doing.
+
+- If it defines PMMO data or bridges at load time, use startup.
+- If it reacts to play, use server.
+- If it generates ProbeJS docs, use server.

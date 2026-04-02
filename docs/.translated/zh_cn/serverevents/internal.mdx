@@ -1,0 +1,82 @@
+---
+title: 内部钩子
+hide_meta: true
+---
+
+# 内部钩子
+
+`PmmoJS.internal` 用来覆盖那些不会经过 PMMO `EventTriggerRegistry` 的处理器路径。
+
+如果你要拦截 Project MMO 的登录同步、维度切换检查、坐骑检查、活塞区块追踪、爆炸过滤、玩家死亡 XP 惩罚、药水酿造等逻辑，就应该使用这一组事件。
+
+在 PMMO `1.20.1-1.7.40` 下，当前支持的内部钩子类型有：
+
+- `DIMENSION_TRAVEL`
+- `EXPLOSION`
+- `LOGIN`
+- `MOUNT`
+- `PISTON`
+- `PLAYER_DEATH`
+- `POTION_BREW`
+- `SLEEP_FINISHED`
+
+`PMMOInternalEventJS` 有两套不同的控制语义：
+
+- `return false` 或 `event.skipPmmo()` 只会跳过 PMMO 自己的处理逻辑，不会自动取消底层 Forge 行为。
+- `event.deny()` 或 `event.setActionCancelled(true)` 会在 Forge 事件本身支持取消时，直接取消该行为，并同时跳过 PMMO 处理。
+
+```js
+PmmoJS.internal(PMMOInternalType.DIMENSION_TRAVEL, event => {
+    const player = event.getPlayer()
+    if (!player) return
+
+    if (player.stages.has('pmmo_bypass_travel')) {
+        event.skipPmmo()
+    }
+
+    if (player.stages.has('pmmo_lock_dimensions')) {
+        event.deny()
+    }
+})
+```
+
+对于药水酿造，`POTION_BREW` 会暴露 PMMO 最终要发放的 XP 奖励表，以及 PMMO 自己使用的 brewed 标记逻辑：
+
+```js
+PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
+    if (event.getContextBoolean('alreadyTracked')) {
+        return
+    }
+
+    event.addXpAward('alchemy', 10)
+    event.putContextBoolean('markBrewed', true)
+})
+```
+
+`PMMOInternalEventJS` 常用方法：
+
+- `getType()`、`getTypeId()`
+- `getForgeEvent()`、`getForgeEventClassName()`
+- `hasPlayer()`、`getPlayer()`、`getServerPlayer()`
+- `shouldSkipPmmo()`、`setSkipPmmo(true)`、`skipPmmo()`
+- `canCancelAction()`、`isActionCancelled()`、`setActionCancelled(true)`、`deny()`
+- `getContext()` 以及一整套 `getContext*` / `putContext*`
+- `getXpAwards()`、`setXpAwards()`、`setXpAward()`、`addXpAward()`
+
+<Callout variant="info">
+    `POTION_BREW` 现在也已经接入 `PmmoJS.trigger(EventType.BREW, ...)`。
+    如果你要处理 PMMO 的 `EventType` 语义，请优先用 `PmmoJS.trigger`。
+    如果你要改的是处理器本身的专属逻辑，请用 `PmmoJS.internal`。
+</Callout>
+
+## ProbeJS
+
+PmmoJS 不需要单独再做一个 ProbeJS 专属 Java 事件。
+
+ProbeJS 已经提供了 `ProbeJSEvents.generateDoc`，因此推荐做法是：
+
+- 在 Java 侧保持完整的 `@Info` 注解与类型化 `Extra`
+- 通过 `ProbeJSEvents.generateDoc` 添加 snippet 或文档变换
+- 直接参考 `run/kubejs/server_scripts/pmmojs_probe_docs.js` 与 `run/kubejs/server_scripts/pmmojs_test_runtime.js` 里的示例
+
+这样 ProbeJS 支持会和标准 KubeJS 机制保持一致，而不是额外再分裂出一套文档事件体系。

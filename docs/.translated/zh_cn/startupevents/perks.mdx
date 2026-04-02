@@ -1,0 +1,267 @@
+---
+title: Perk 注册
+hide_meta: true
+---
+
+# 启动阶段 Perk 注册
+
+`PmmoJS.registerPerk(...)` 用于在 `startup_scripts/` 中注册新的 PMMO perk 类型。
+
+如果你的目标是修改已有的 perk 配置项，而不是定义新类型，请在 `server_scripts/` 中使用 `PmmoJS.perksConfig(...)`。
+
+## 基本写法
+
+```js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
+    .withSkill('combat')
+    .description('A startup perk registered from KubeJS.')
+    .conditions(ctx => true)
+    .start(ctx => {})
+    .tick(ctx => {})
+    .stop(ctx => {})
+    .status(ctx => {})
+    .register()
+})
+```
+
+## `event.create(perkId, side)`
+
+参数：
+
+- `perkId`：`String` 或 `ResourceLocation`
+- `side`：`PMMOPerkSide.SERVER`、`PMMOPerkSide.CLIENT`、`PMMOPerkSide.BOTH`
+
+说明：
+
+- 裸字符串 id 会自动默认到 `kubejs:` 命名空间
+- 返回值是 `PerkRegistryFactory`
+
+## 默认设置方法
+
+这些方法会把默认值写入 perk 的启动默认 tag。
+
+| 方法 | 作用 |
+| --- | --- |
+| `defaults(tag => {})` | 直接通过 `PerkTagJS` 编辑默认 tag |
+| `withSkill(skill)` | 设置默认 `skill` 字段 |
+| `withCooldown(ticks)` | 设置默认 `cooldown` 字段 |
+| `withDuration(ticks)` | 设置默认 `duration` 字段 |
+| `withChance(value)` | 设置默认 `chance` 字段 |
+| `withMinLevel(level)` | 设置默认 `min_level` 字段 |
+| `withMaxLevel(level)` | 设置默认 `max_level` 字段 |
+| `withPerXLevel(levelStep)` | 设置默认 `per_x_level` 字段 |
+| `withMilestones(values)` | 设置默认 `milestones` 字段 |
+| `withString(key, value)` | 设置字符串字段 |
+| `withBool(key, value)` | 设置布尔字段 |
+| `withInt(key, value)` | 设置整数字段 |
+| `withLong(key, value)` | 设置长整数字段 |
+| `withFloat(key, value)` | 设置浮点字段 |
+| `withDouble(key, value)` | 设置双精度字段 |
+| `withStringList(key, values)` | 设置字符串列表字段 |
+| `withNumberList(key, values)` | 设置数字列表字段 |
+| `withCompound(key, value)` | 设置嵌套 compound 字段 |
+
+## 回调方法
+
+| 方法 | Context 类型 | 作用 |
+| --- | --- | --- |
+| `conditions(ctx => boolean)` | `PerkConditionContextJS` | 添加额外激活条件 |
+| `start(ctx => {})` | `PerkStartContextJS` | perk 激活时执行 |
+| `tick(ctx => {})` | `PerkTickContextJS` | perk 维持期间执行 |
+| `stop(ctx => {})` | `PerkStopContextJS` | perk 结束时执行 |
+| `status(ctx => {})` | `PerkStatusContextJS` | 构建状态文本 |
+| `description(value)` | `String` 或 `Component` | 设置 perk 描述 |
+| `register()` | 无 | 将 perk 注册到 PMMO |
+
+## Context 数据
+
+所有回调 context 都提供：
+
+- `getPerkId()`
+- `getPerkIdLocation()`
+- `getPlayer()`
+- `getServerPlayer()`
+- `getSettings()`
+
+额外方法：
+
+| Context | 额外方法 |
+| --- | --- |
+| `PerkStartContextJS` | `getResult()` |
+| `PerkTickContextJS` | `getElapsedTicks()` |
+| `PerkStatusContextJS` | `addLine(value)`、`addLines(values)`、`clearLines()`、`getLines()` |
+
+## `PerkTagJS`
+
+`ctx.getSettings()` 与 `ctx.getResult()` 返回的是 `PerkTagJS`，而不是原始 `CompoundTag`。
+
+PMMO 事件专用的输入/输出 key 见 [自定义 Perk 标签](./custom-perk-tags)。
+
+常用方法：
+
+- `keys()`
+- `has(key)`
+- `remove(key)`
+- `clear()`
+- `getString(key)`、`getStringOr(key, fallback)`
+- `getInt(key)`、`getIntOr(key, fallback)`
+- `getLong(key)`、`getLongOr(key, fallback)`
+- `getFloat(key)`、`getFloatOr(key, fallback)`
+- `getDouble(key)`、`getDoubleOr(key, fallback)`
+- `getBoolean(key)`、`getBooleanOr(key, fallback)`
+- `getOrCreateCompound(key)`
+- `putString(key, value)`
+- `putBoolean(key, value)`
+- `putInt(key, value)`
+- `putLong(key, value)`
+- `putFloat(key, value)`
+- `putDouble(key, value)`
+- `putCompound(key, value)`
+- `putStringList(key, values)`
+- `putNumberList(key, values)`
+- `merge(value)`
+- `copy()`
+
+PMMO 相关 helper：
+
+- `getSkill()`
+- `getResolvedLevel()`
+- `getCooldown()`
+- `getDuration()`
+- `getChance()`
+
+## 合并顺序
+
+在 PMMO 调用 perk 回调之前，会按这个顺序构建一份合并后的 settings/source tag：
+
+1. `registerPerk` 中定义的 startup 默认值
+2. 命中的 `perks.toml` 配置项
+3. 当前 PMMO trigger/context 传入的数据
+4. 同一轮执行中，前面 perk 已经产出的输出
+
+如果合并后的 tag 中包含 `skill`，PMMO 还会根据当前玩家补入解析后的 `level` 字段。
+
+`ctx.getSettings()` 读取的就是这份合并结果。
+
+## 生命周期速查
+
+如果只想先搞清楚每个函数该干什么，看这张表就够了：
+
+| 阶段 | 主要函数 | 通常读什么 | 通常写什么 | 会保留到后续阶段吗 |
+| --- | --- | --- | --- | --- |
+| 初始化 | `withSkill(...)`、`withInt(...)`、`defaults(...)` | 这时还没有运行期标签 | startup 默认 tag | 会，后面会进入 `ctx.getSettings()` |
+| 激活检查 | `conditions(ctx)` | `ctx.getSettings()` | 只返回布尔值 | 不会单独新增标签数据 |
+| 激活 | `start(ctx)` | `ctx.getSettings()` 与 `ctx.getResult()` | 持久状态写到 `getSettings()`，一次性输出写到 `getResult()` | `getSettings()` 会保留，`getResult()` 只服务当前 PMMO 执行 |
+| 持续阶段 | `tick(ctx)` | `ctx.getSettings()`、`ctx.getElapsedTicks()` | 通常还是写回 `ctx.getSettings()` | 会 |
+| 结束阶段 | `stop(ctx)` | `ctx.getSettings()` | 对 `ctx.getSettings()` 做清理或归一化 | 取决于你是否保留这些值 |
+| UI | `status(ctx)` | `ctx.getSettings()` | 通过 `addLine(...)` 或 `addLines(...)` 写状态文本 | 只保留 UI 文本 |
+
+## 生命周期行为
+
+### `conditions(ctx)`
+
+- 运行在 PMMO 内置 `Perk.VALID_CONTEXT` 之后
+- 用于添加额外激活条件
+- 从 `ctx.getSettings()` 读取数据
+
+### `start(ctx)`
+
+- 通过 `ctx.getSettings()` 读取和修改 settings/source tag
+- 通过 `ctx.getResult()` 写入本次执行的即时输出
+- `ctx.getResult()` 中的数据会被合并回当前这次 perk 执行
+- 对 `ctx.getSettings()` 的修改会被复制到后续 `tick()` 与 `stop()` 使用的 source tag 中
+
+### `tick(ctx)`
+
+- 通过 `ctx.getSettings()` 读取和修改持久 source tag
+- 通过 `ctx.getElapsedTicks()` 读取已过去的 tick 数
+- PMMO 会忽略 `tick()` 的返回值
+
+### `stop(ctx)`
+
+- 通过 `ctx.getSettings()` 读取和修改同一份持久 source tag
+- PMMO 会忽略 `stop()` 的返回值
+
+### `status(ctx)`
+
+- 通过 `ctx.getSettings()` 读取同一份 settings/source tag
+- 通过 `addLine(...)` 或 `addLines(...)` 构建状态文本
+
+## 生命周期状态
+
+PMMO 不会额外提供第二份隐藏的运行期 state 对象。
+
+对于生命周期状态：
+
+- 如果数据需要延续到后续 `tick()` 或 `stop()`，请写入 `ctx.getSettings()`
+- 如果 `start()` 需要向当前 perk 执行流程输出结果，请写入 `ctx.getResult()`
+
+## 完整生命周期示例
+
+```js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
+    .withSkill('combat')
+    .withCooldown(200)
+    .withDuration(100)
+    .withMinLevel(10)
+    .withInt('heal_interval', 20)
+    .withDouble('heal_amount', 1.0)
+    .defaults(tag => {
+      tag.putBoolean('active', false)
+      tag.putLong('started_at', 0)
+    })
+    .description('Heals the player while the perk stays active.')
+    .conditions(ctx => {
+      return ctx.getPlayer().getHealth() < ctx.getPlayer().getMaxHealth()
+    })
+    .start(ctx => {
+      ctx.getSettings().putBoolean('active', true)
+      ctx.getSettings().putLong('started_at', ctx.getPlayer().level().getGameTime())
+      ctx.getResult().putString('steady_mind_started', ctx.getPerkId())
+    })
+    .tick(ctx => {
+      const settings = ctx.getSettings()
+      const interval = settings.getIntOr('heal_interval', 20)
+      const amount = settings.getDoubleOr('heal_amount', 1.0)
+
+      if (settings.getBooleanOr('active', false) && ctx.getElapsedTicks() % interval === 0) {
+        ctx.getPlayer().heal(amount)
+      }
+    })
+    .stop(ctx => {
+      ctx.getSettings().putBoolean('active', false)
+    })
+    .status(ctx => {
+      const settings = ctx.getSettings()
+      ctx.clearLines()
+      ctx.addLine(`perk: ${ctx.getPerkId()}`)
+      ctx.addLine(`skill: ${settings.getSkill()}`)
+      ctx.addLine(`resolved level: ${settings.getResolvedLevel()}`)
+      ctx.addLine(`active: ${settings.getBooleanOr('active', false)}`)
+    })
+    .register()
+})
+```
+
+这个例子可以这样读：
+
+- `withInt('heal_interval', 20)` 与 `withDouble('heal_amount', 1.0)` 是普通 startup 默认字段。
+- `defaults(tag => {})` 在 PMMO 调用 perk 之前先种好私有生命周期字段。
+- `conditions(ctx)` 只负责决定能不能继续激活。
+- `start(ctx)` 故意同时写两类数据：
+  `ctx.getSettings()` 里的 `active` 与 `started_at` 会留给后续 `tick()` 和 `status()` 使用。
+  `ctx.getResult()` 里的 `steady_mind_started` 只用于当前这次 PMMO 执行流程。
+- `tick(ctx)` 展示了最常见的状态型 perk 写法：从 `ctx.getSettings()` 读配置与私有状态，再用 `ctx.getElapsedTicks()` 控制时机。
+- `stop(ctx)` 负责清理或重置同一份持久状态。
+- `status(ctx)` 只负责 UI 文本，不负责新建生命周期状态。
+
+## 相关页面
+
+- [启动注册](./registry)
+- [阶段规则](./phases)
+- [自定义 Perk 标签](./custom-perk-tags)
+- [标签模型](../tag-model)

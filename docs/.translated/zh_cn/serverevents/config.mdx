@@ -1,225 +1,207 @@
 ---
-title: 核心配置
+title: 配置事件
 hide_meta: true
 ---
 
 # 配置事件
 
-通过服务端事件配置PMMO的核心系统
+这些事件允许你在 `server_scripts/` 中直接调整 PMMO 配置数据。
 
-## 反作弊配置
+## 通用配置：`config/pmmojs-common.toml`
 
-反作弊系统用于防止通过挂机和重复操作刷取经验
+在 KubeJS 配置事件执行之前，PmmoJS 可以先通过 Forge 通用配置关闭 PMMO 自带的默认数据。
 
-```js
-PmmoJS.antiCheese((event) => {
-    event.setAfkCanSubtract(false); // 设置AFK时是否扣除经验
+当你想让整合包从更干净的基线开始，而又不想在 `server_scripts/` 里复制一大段重置脚本时，这就是首选方案。
 
-    event
-        .addAfkSetting(EventType.BREAK) // 添加破坏方块的AFK检测
-        .minTime(600) // 30秒后开始应用惩罚
-        .reduction(0.1) // 每半秒减少10%经验
-        .cooloff(5) // 非AFK时每半秒减少5tick的AFK时间
-        .tolerance(3.0) // AFK检测的距离容差
-        .strictTolerance(true) // 考虑视角移动
-        .build();
-
-    // 添加重复操作的收益递减设置
-    event
-        .addDiminishingSetting(EventType.KILL) // 击杀实体类型
-        .retention(6000) // 5分钟后重置
-        .reduction(0.1) // 每次重复减少10%
-        .build();
-
-    // 添加经验获取标准化设置
-    event
-        .addNormalizationSetting(EventType.CRAFT) // 合成物品类型
-        .retention(1200) // 1分钟追踪期
-        .toleranceFlat(50) // 小量经验固定容差
-        .tolerancePercent(0.2) // 大量经验20%容差
-        .build();
-});
+```toml
+[disableDefaultSettings]
+all = false
+skills = false
+perks = false
+requirements = false
+xpAwards = false
+itemExtras = false
+blockVeinData = false
 ```
 
-## 自动数值配置
+执行顺序：
 
-配置自动化的经验奖励和需求计算
+1. PmmoJS 读取 `pmmojs-common.toml`
+2. 按开关清掉对应类别的 PMMO 默认数据
+3. 再执行 `PmmoJS.skillsConfig(...)`、`PmmoJS.perksConfig(...)` 与 `PmmoJS.settings(...)`
+
+也就是说，通用配置负责清底，你的脚本仍然会在后面覆盖并补回自定义内容。
+
+## `PmmoJS.skillsConfig`
+
+用于添加、替换或移除 PMMO 技能。
 
 ```js
-PmmoJS.autoValues((event) => {
-    // 全局设置
+PmmoJS.skillsConfig(event => {
     event
-        .setAutoValuesEnabled(true) // 启用自动计算
-        .setRaritiesModifier(1.5) // 稀有度系数
-        .setHardnessModifier(2.0); // 硬度系数
+        .addSkill('defense')
+        .withColor(0x2f6fed)
+        .withMaxLevel(100)
+        .withIconSize(18)
+        .build()
 
-    // 经验奖励配置
-    event.addItemXpAward(EventType.CRAFT, "smithing", 25); // 物品合成奖励
-    event.addBlockXpAward(EventType.BREAK, "mining", 50); // 方块破坏奖励
-    event.addEntityXpAward(EventType.KILL, "combat", 100); // 实体击杀奖励
-
-    // 从自动计算中移除技能
-    event.removeItemXpSkill(EventType.CRAFT, "agility"); // 移除敏捷技能
-
-    // 工具特定覆盖
-    event.setAxeOverride({ // 斧头工具覆盖
-        woodcutting: 15, // 伐木技能
-        foraging: 5, // 采集技能
-    });
-
-    // 需求配置
-    event.addItemReq(ReqType.WEAR, "defense", 10); // 穿戴物品需求
-    event.addBlockReq(ReqType.BREAK, "mining", 5); // 破坏方块需求
-});
+    event.removeDefaultSkill('swimming')
+})
 ```
 
-## 被动加成配置
+如果同一次处理里先移除再添加同名技能，最终会以你自定义的技能定义为准。
 
-定义玩家在特定技能等级解锁的被动效果
-[更多信息](https://moddedmc.wiki/en/project/pmmo/1.20.1/core/perks)
+## `PmmoJS.globalsConfig`
+
+用于管理 PMMO 的全局数据，例如可复用的 NBT 路径与常量。
 
 ```js
-PmmoJS.perksConfig((event) => {
-    // 添加随敏捷等级提升的跳跃增强
-    event
-        .addPerk(EventType.JUMPED, "pmmo:jump_boost", "agility")
-        .asJumpBoostPerk() // 跳跃增强类型
-        .withMinLevel(10) // 最低等级要求
-        .withBase(0.05) // 基础加成
-        .withPerLevel(0.01) // 每级加成
-        .withMaxBoost(0.5) // 最大加成
-        .build();
-
-    // 为特定武器添加伤害加成
-    event
-        .addPerk(EventType.DEAL_DAMAGE, "pmmo:damage_boost", "combat")
-        .asDamageBoostPerk() // 伤害增强类型
-        .forWeapons("minecraft:sword", "minecraft:axe") // 适用武器
-        .withBase(0.1) // 基础加成
-        .withPerLevel(0.01) // 每级加成
-        .withMaxBoost(1.0) // 最大加成
-        .withCooldown(100) // 冷却时间
-        .build();
-
-    // 添加药水效果特权
-    event
-        .addPerk(EventType.KILL, "pmmo:regen_effect", "endurance")
-        .asEffectPerk() // 药水效果类型
-        .withEffect("minecraft:regeneration") // 再生效果
-        .withDuration(200) // 持续时间
-        .withModifier(0) // 效果等级
-        .withMinLevel(25) // 最低等级
-        .withChance(0.15) // 触发概率
-        .build();
-
-    // 清除特定类型的所有特权
-    event.clearPerks(EventType.BLOCK_PLACE); // 清除方块放置相关特权
-
-    // 移除特定特权类型
-    event.removePerkType("pmmo:fireworks"); // 移除烟花特效
-});
+PmmoJS.globalsConfig(event => {
+    event.addPath('durability', 'Damage')
+    event.addConstant('MAX_SKILL_LEVEL', '100')
+    event.removePath('old_path')
+    event.removeConstant('OLD_CONSTANT')
+})
 ```
 
-## 技能配置
+## `PmmoJS.perksConfig`
 
-定义技能和技能组
+用于编辑已有的 PMMO Perk 数据。
 
 ```js
-PmmoJS.skillsConfig((event) => {
-    event
-        .addSkill("test") // 添加测试技能
-        .withColor(0xa52a2a) // 颜色代码
-        .withIcon(new ResourceLocation("pmmo", "textures/skills/archery.png")) // 图标路径
-        .withIconSize(32) // 图标尺寸
-        .withMaxLevel(100) // 最大等级
-        .build();
-
-    event
-        .addSkill("combat") // 添加战斗技能组
-        .withColor(0xff0000) // 红色
-        .withUseTotal(true) // 使用总等级
-        .setGroupOf({ // 子技能组成
-            swordsmanship: 0.6, // 剑术占比60%
-            archery: 0.4, // 箭术占比40%
-        })
-        .build();
-
-    // 移除默认技能
-    event.removeDefaultSkill("swiming"); // 移除游泳技能
-    // 修改现有技能
-    const test = SKillHelper.getSkill("test"); // 获取测试技能
-    event.removeDefaultSkill("test"); // 移除原版测试技能
-    event
-        .addSkill("test") // 重新添加修改版
-        .withAfkExempt(test.afkExempt()) // 继承AFK豁免
-        .withColor(test.color()) // 继承颜色
-        .withUseTotal(test.useTotalLevels()) // 继承总等级设置
-        .withIcon(test.icon()) // 继承图标
-        .withIconSize(test.iconSize()) // 继承图标尺寸
-        .withDisplayName(test.displayGroupName()) // 继承显示名称
-        .withMaxLevel(test.maxLevel()); // 继承最大等级
-});
+PmmoJS.perksConfig(event => {
+    event.clearPerks(EventType.SKILL_UP)
+    event.removePerkType('pmmo:fireworks')
+})
 ```
 
-## 服务端配置
+核心控制方法：
 
-修改核心服务端设置
+- `addPerk(eventType, perkId, skill)`
+- `clearPerks(eventType)`
+- `removePerkType(perkId)`
+- `removePerk(tag)`
+
+配置合并行为：
+
+1. PmmoJS 先复制 PMMO 当前的 `PerksConfig.PERK_SETTINGS`
+2. `clearPerks(eventType)` 会把该事件类型的列表直接清空
+3. `removePerkType(perkId)` 会跨全部事件移除匹配 `perk` 的条目
+4. `removePerk(tag)` 按 `perk` 与 `skill` 两个字段匹配移除
+5. `addPerk(...)` 会把新的 perk tag 追加到指定事件列表
+
+builder 会写入的基础 key：
+
+| 方法 | 写入的 Key |
+| --- | --- |
+| `addPerk(eventType, perkId, skill)` | `perk`、`skill` |
+| `withCooldown(...)` | `cooldown` |
+| `withChance(...)` | `chance` |
+| `withMinLevel(...)` | `min_level` |
+| `withMaxLevel(...)` | `max_level` |
+| `withPerXLevel(...)` | `per_x_level` |
+| `withMilestones(...)` | `milestones` |
+| `withString(...)`、`withBool(...)`、`withInt(...)`、`withLong(...)`、`withFloat(...)`、`withDouble(...)` | 自定义标量 key |
+| `withStringList(...)` | 自定义字符串列表 key |
+| `withList(...)` | 原始 `ListTag` key |
+| `withCompound(...)` | 嵌套 compound key |
+
+专用 builder 家族：
+
+下表描述的是每个 builder 在 PmmoJS 中暴露的 key。某个 key 能通过 builder 写入，并不等于 PMMO 会在所有 perk 类型上都解释这个 key。
+
+| Builder | 额外 Key |
+| --- | --- |
+| `asAttributePerk()` | `attribute`、`multiplicative`，以及 `max_boost`、`per_level`、`base` |
+| `asTempAttributePerk()` | `attribute`、`multiplicative`、`duration`，以及 `max_boost`、`per_level`、`base` |
+| `asDamageBoostPerk()` | `applies_to`、`for_damage`、`multiplicative`，以及 `max_boost`、`per_level`、`base` |
+| `asDamageReducePerk()` | `for_damage`，以及 `max_boost`、`per_level`、`base` |
+| `asBreakSpeedPerk()` | `pickaxe_dig`、`axe_dig`、`shovel_dig`、`hoe_dig`、`shears_dig`、`sword_dig`，以及 `max_boost`、`per_level`、`base` |
+| `asEffectPerk()` | `effect`、`duration`、`modifier`、`ambient`、`visible`、`show_icon`，以及 `max_boost`、`per_level`、`base` |
+| `asCommandPerk()` | `command`、`function`，以及继承得到的基础 key 方法 |
+| `asFireworksPerk()` | `colors`，以及继承得到的基础 key 方法 |
+| `asJumpBoostPerk()` | `max_boost`、`per_level`、`base` |
+| `asBreathPerk()` | `max_boost`、`per_level`、`base` |
+| `asVillagerBoostPerk()` | `max_boost`、`per_level`、`base` |
+| `asTameBoostPerk()` | `max_boost`、`per_level`、`base` |
+
+示例：
 
 ```js
-PmmoJS.serverConfig((event) => {
-    // 基础游戏设置
-    event
-        .setCreativeReach(15.0) // 创造模式交互距离
-        .setSalvageBlock("minecraft:anvil") // 设置分解台方块
-        .setTreasureEnabled(true); // 启用宝藏系统
-
-    // 等级系统设置
-    event
-        .setMaxLevel(100) // 最大等级
-        .setLossOnDeath(0.1) // 死亡经验损失比例
-        .setLoseLevelsOnDeath(false) // 是否降级
-        .setUseExponentialFormula(true); // 使用指数公式
-
-    // 经验计算公式参数
-    event
-        .setExponentialBaseXp(100) // 基础经验值
-        .setExponentialPowerBase(1.05) // 指数基数
-        .setExponentialLevelMod(1.15); // 等级修正系数
-
-    // 需求开关设置
-    event
-        .setReqEnabled(ReqType.BREAK, true) // 启用破坏需求
-        .setReqEnabled(ReqType.PLACE, false); // 禁用放置需求
-
-    // 运动经验设置
-    event
-        .addJumpXp("agility", 0.5) // 跳跃经验
-        .addSprintJumpXp("agility", 1.0) // 冲刺跳跃经验
-        .addSwimmingXp("swimming", 0.2); // 游泳经验
-
-    // 战斗经验设置
-    event
-        .addDealDamageXp("minecraft:player", "combat", 5) // 对玩家造成伤害
-        .addReceiveDamageXp("minecraft:fall", "endurance", 2); // 承受跌落伤害
-
-    // 矿脉系统设置
-    event.setVeinEnabled(true).setBaseChargeRate(0.5).setBaseChargeCap(1000); // 启用矿脉/基础充能率/容量
-});
+PmmoJS.perksConfig(event => {
+  event
+    .addPerk(EventType.SKILL_UP, 'pmmo:attribute', 'endurance')
+    .asAttributePerk()
+    .withAttribute(Java.loadClass('net.minecraft.world.entity.ai.attributes.Attributes').MAX_HEALTH)
+    .withPerLevel(1)
+    .withMaxBoost(10)
+    .build()
+})
 ```
 
-## 全局配置
+startup 自定义 perk 与 PMMO 事件输入/输出标签参考页：
 
-定义数据访问的全局路径和常量
+- [自定义 Perk 标签](../startupevents/custom-perk-tags)
+- [标签模型](../tag-model)
+- [清空默认数据](./reset-recipes)
+
+## `PmmoJS.serverConfig`
+
+用于修改 PMMO 的服务端配置值。
 
 ```js
-PmmoJS.globalsConfig((event) => {
-    event.addPath("durability", "Damage"); // 添加耐久度数据路径
-    event.addConstant("MAX_SKILL_LEVEL", "100"); // 添加最大等级常量
-    event.remove("unused_path"); // 移除无用路径
-    event.removeConstant("OLD_CONSTANT"); // 移除旧常量
-});
+PmmoJS.serverConfig(event => {
+    event
+        .setMaxLevel(100)
+        .setGlobalModifier(1.0)
+        .setUseExponentialFormula(true)
+        .setTreasureEnabled(true)
+
+    event.addSkillModifier('defense', 1.1)
+    event.addJumpXp('agility', 0.5)
+    event.addPartyBonus('charisma', 0.1)
+})
+```
+
+## `PmmoJS.autoValueConfig`
+
+用于覆盖 PMMO 的 auto-value 自动生成逻辑。
+
+```js
+PmmoJS.autoValueConfig(event => {
+    event
+        .setAutoValuesEnabled(true)
+        .setRaritiesModifier(1.5)
+        .setHardnessModifier(2.0)
+
+    event.addItemXpAward(EventType.CRAFT, 'smithing', 25)
+    event.addBlockReq(ReqType.BREAK, 'mining', 5)
+    event.setAxeOverride({
+        woodcutting: 15
+    })
+})
+```
+
+## `PmmoJS.antiCheeseConfig`
+
+用于编辑 AFK 检测、收益递减与标准化等 anti-cheese 设置。
+
+```js
+PmmoJS.antiCheeseConfig(event => {
+    event.setAfkCanSubtract(false)
+
+    event
+        .addAfkSetting(EventType.BLOCK_BREAK)
+        .minTime(600)
+        .reduction(0.1)
+        .cooloff(5)
+        .tolerance(3.0)
+        .strictTolerance(true)
+        .build()
+})
 ```
 
 <Callout variant="info">
-    配置事件在服务端启动时应用，修改后也无需重启服务器
+    这些配置事件走的是服务端 / 静态数据重载路径，因此能和 PMMO 自身配置重载
+    以及 EMI 标签同步流程保持兼容。
 </Callout>

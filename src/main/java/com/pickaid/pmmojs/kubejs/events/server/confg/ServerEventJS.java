@@ -8,6 +8,7 @@ import net.minecraft.world.item.Item;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -87,6 +88,61 @@ public class ServerEventJS extends EventJS {
     public static List<String> veinBlacklist = new ArrayList<>();
     public static Double baseChargeRate;
     public static Integer baseChargeCap;
+
+    public ServerEventJS() {
+        creativeReach = null;
+        salvageBlock = null;
+        treasureEnabled = null;
+        brewingTracked = null;
+        maxLevel = null;
+        lossOnDeath = null;
+        loseLevelsOnDeath = null;
+        loseOnlyExcess = null;
+        useExponentialFormula = null;
+        globalModifier = null;
+        skillModifiers = new LinkedHashMap<>();
+        linearBaseXp = null;
+        linearPerLevel = null;
+        exponentialBaseXp = null;
+        exponentialPowerBase = null;
+        exponentialLevelMod = null;
+        reqEnabled = new LinkedHashMap<>();
+        reusePenalty = null;
+        summatedMaps = null;
+        dealDamageXp = new LinkedHashMap<>();
+        receiveDamageXp = new LinkedHashMap<>();
+        jumpXp = new LinkedHashMap<>();
+        sprintJumpXp = new LinkedHashMap<>();
+        crouchJumpXp = new LinkedHashMap<>();
+        breathChangeXp = new LinkedHashMap<>();
+        healthChangeXp = new LinkedHashMap<>();
+        healthIncreaseXp = new LinkedHashMap<>();
+        healthDecreaseXp = new LinkedHashMap<>();
+        sprintingXp = new LinkedHashMap<>();
+        submergedXp = new LinkedHashMap<>();
+        swimmingXp = new LinkedHashMap<>();
+        divingXp = new LinkedHashMap<>();
+        surfacingXp = new LinkedHashMap<>();
+        swimSprintingXp = new LinkedHashMap<>();
+        partyRange = null;
+        partyBonus = new LinkedHashMap<>();
+        mobScalingEnabled = null;
+        mobUseExponentialFormula = null;
+        mobScalingAoe = null;
+        mobScalingBaseLevel = null;
+        mobLinearPerLevel = null;
+        mobExponentialPowerBase = null;
+        mobExponentialLevelMod = null;
+        bossScalingRatio = null;
+        mobScaling = new LinkedHashMap<>();
+        veinEnabled = null;
+        requireSetting = null;
+        defaultConsume = null;
+        veinChargeModifier = null;
+        veinBlacklist = new ArrayList<>();
+        baseChargeRate = null;
+        baseChargeCap = null;
+    }
 
     @Info("Sets the creative mode reach distance")
     public ServerEventJS setCreativeReach(double value) {

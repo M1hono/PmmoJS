@@ -1,8 +1,88 @@
-# KubeJS PMMO
+# PmmoJS Overview
 
-This is a mod for making compat between KubeJS with Project MMO
-If you encounter any issues, please report to us or discuss on [Discord](https://discord.gg/uPJHxU46td).
+`PmmoJS` is a KubeJS addon for Project MMO on Forge `1.20.1`.
+
+It gives pack authors three layers of control:
+
+1. Startup registries for custom PMMO predicates and custom perk types.
+2. Server config events for PMMO config files such as `skills.toml`, auto-values, perks, globals, and anti-cheese.
+3. Runtime gameplay hooks for XP, enchanting, furnace output, salvage, PMMO damage-penalty handling, the PMMO `EventType` trigger registry, and PMMO handler-specific internal hooks.
+
+Reference pages for perk authoring:
+
+- [Tag Model](./tag-model)
+- [Custom Perk Tags](./startupevents/custom-perk-tags)
+- [Reset Defaults](./serverevents/reset-recipes)
+
+If you want PMMO to start from a mostly blank baseline, use `config/pmmojs-common.toml` first and then add back only the data your pack needs through KubeJS.
+
+## Event Groups
+
+Startup:
+
+- `PmmoJS.registerPredicate`
+- `PmmoJS.registerPerk`
+
+Server config:
+
+- `PmmoJS.settings`
+- `PmmoJS.globalsConfig`
+- `PmmoJS.skillsConfig`
+- `PmmoJS.perksConfig`
+- `PmmoJS.serverConfig`
+- `PmmoJS.autoValueConfig`
+- `PmmoJS.antiCheeseConfig`
+
+Runtime:
+
+- `PmmoJS.trigger`
+- `PmmoJS.internal`
+- `PmmoJS.xp`
+- `PmmoJS.enchant`
+- `PmmoJS.furnace`
+- `PmmoJS.salvage`
+- `PmmoJS.itemstackDamagePenalty`
+- `PmmoJS.entityDamagePenalty`
+
+## Bindings
+
+The plugin registers the following helpers for scripts:
+
+- `EventType`
+- `PMMOInternalType`
+- `PMMOPerkSide`
+- `ModifierDataType`
+- `ObjectType`
+- `ReqType`
+- `PmmoHelper`
+
+Binding availability is script-type specific:
+
+- Startup: `PmmoHelper`, `TagBuilder`, `NbtPathBuilder`
+- Server: `PmmoHelper`, `SkillHelper`, `SKillHelper`, `CustomReqMap`, `TagBuilder`, `NbtPathBuilder`, `SalvageBuilder`
+- Client: `SkillHelper`, `SKillHelper` as read-only skill helpers
+
+`PmmoHelper` is the curated non-overloaded binding for PMMO internals. It wraps common PMMO operations such as:
+
+- skill level and XP reads/writes
+- requirement and XP-award lookups
+- direct PMMO data registration helpers
+- party and vein-mining logic
+- direct XP awarding and salvage triggers
+- trigger and internal-hook id discovery through `getTriggerTypeIds()` and `getInternalTypeIds()`
+- trigger-listener registration when you need to hook PMMO directly instead of going through `PmmoJS.trigger`
+
+`PmmoJS.trigger(EventType.BREW, ...)` is now live on `1.20.1`, and the PMMO handlers that never use the trigger registry are exposed through `PmmoJS.internal(...)`.
+
+## Version Notes
+
+- Target Minecraft version: `1.20.1`
+- Target PMMO line: `1.7.40`
+- EMI is included in the development runtime only, to reproduce recipe-viewer sync bugs such as tag-reload regressions.
 
 <Callout>
-    Some content might need more testing.
+    Use `startup_scripts/` for registrations such as predicates, perk types,
+    direct PMMO data registration, and `ForgeEvents.onEvent(...)`. Use
+    `server_scripts/` for PMMO settings, config edits, gameplay hooks, and
+    `ProbeJSEvents.generateDoc(...)`.
 </Callout>

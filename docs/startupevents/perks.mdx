@@ -1,0 +1,267 @@
+---
+title: Perk Registration
+hide_meta: true
+---
+
+# Startup Perk Registration
+
+`PmmoJS.registerPerk(...)` registers new PMMO perk types from `startup_scripts/`.
+
+Use `PmmoJS.perksConfig(...)` in `server_scripts/` when you need to edit existing perk configuration entries instead of defining a new perk type.
+
+## Syntax
+
+```js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
+    .withSkill('combat')
+    .description('A startup perk registered from KubeJS.')
+    .conditions(ctx => true)
+    .start(ctx => {})
+    .tick(ctx => {})
+    .stop(ctx => {})
+    .status(ctx => {})
+    .register()
+})
+```
+
+## `event.create(perkId, side)`
+
+Parameters:
+
+- `perkId`: `String` or `ResourceLocation`
+- `side`: `PMMOPerkSide.SERVER`, `PMMOPerkSide.CLIENT`, or `PMMOPerkSide.BOTH`
+
+Notes:
+
+- Bare string ids default to the `kubejs:` namespace
+- The returned object is a `PerkRegistryFactory`
+
+## Default Setting Methods
+
+These methods write default values to the perk's startup default tag.
+
+| Method | Purpose |
+| --- | --- |
+| `defaults(tag => {})` | Edit the default tag directly through `PerkTagJS` |
+| `withSkill(skill)` | Set the default `skill` field |
+| `withCooldown(ticks)` | Set the default `cooldown` field |
+| `withDuration(ticks)` | Set the default `duration` field |
+| `withChance(value)` | Set the default `chance` field |
+| `withMinLevel(level)` | Set the default `min_level` field |
+| `withMaxLevel(level)` | Set the default `max_level` field |
+| `withPerXLevel(levelStep)` | Set the default `per_x_level` field |
+| `withMilestones(values)` | Set the default `milestones` field |
+| `withString(key, value)` | Set a string field |
+| `withBool(key, value)` | Set a boolean field |
+| `withInt(key, value)` | Set an int field |
+| `withLong(key, value)` | Set a long field |
+| `withFloat(key, value)` | Set a float field |
+| `withDouble(key, value)` | Set a double field |
+| `withStringList(key, values)` | Set a string list field |
+| `withNumberList(key, values)` | Set a numeric list field |
+| `withCompound(key, value)` | Set a nested compound field |
+
+## Callback Methods
+
+| Method | Context Type | Purpose |
+| --- | --- | --- |
+| `conditions(ctx => boolean)` | `PerkConditionContextJS` | Add extra activation checks |
+| `start(ctx => {})` | `PerkStartContextJS` | Run when the perk activates |
+| `tick(ctx => {})` | `PerkTickContextJS` | Run while the perk remains active |
+| `stop(ctx => {})` | `PerkStopContextJS` | Run when the perk stops |
+| `status(ctx => {})` | `PerkStatusContextJS` | Build status lines |
+| `description(value)` | `String` or `Component` | Set the perk description |
+| `register()` | none | Register the perk with PMMO |
+
+## Context Data
+
+All callback context objects expose:
+
+- `getPerkId()`
+- `getPerkIdLocation()`
+- `getPlayer()`
+- `getServerPlayer()`
+- `getSettings()`
+
+Additional context methods:
+
+| Context | Extra Methods |
+| --- | --- |
+| `PerkStartContextJS` | `getResult()` |
+| `PerkTickContextJS` | `getElapsedTicks()` |
+| `PerkStatusContextJS` | `addLine(value)`, `addLines(values)`, `clearLines()`, `getLines()` |
+
+## `PerkTagJS`
+
+`ctx.getSettings()` and `ctx.getResult()` expose a `PerkTagJS` wrapper instead of raw `CompoundTag`.
+
+For PMMO's event-specific input and output keys, see [Custom Perk Tags](./custom-perk-tags).
+
+Common methods:
+
+- `keys()`
+- `has(key)`
+- `remove(key)`
+- `clear()`
+- `getString(key)`, `getStringOr(key, fallback)`
+- `getInt(key)`, `getIntOr(key, fallback)`
+- `getLong(key)`, `getLongOr(key, fallback)`
+- `getFloat(key)`, `getFloatOr(key, fallback)`
+- `getDouble(key)`, `getDoubleOr(key, fallback)`
+- `getBoolean(key)`, `getBooleanOr(key, fallback)`
+- `getOrCreateCompound(key)`
+- `putString(key, value)`
+- `putBoolean(key, value)`
+- `putInt(key, value)`
+- `putLong(key, value)`
+- `putFloat(key, value)`
+- `putDouble(key, value)`
+- `putCompound(key, value)`
+- `putStringList(key, values)`
+- `putNumberList(key, values)`
+- `merge(value)`
+- `copy()`
+
+PMMO-specific helpers:
+
+- `getSkill()`
+- `getResolvedLevel()`
+- `getCooldown()`
+- `getDuration()`
+- `getChance()`
+
+## Merge Order
+
+Before PMMO calls your perk callbacks, it builds one merged settings/source tag in this order:
+
+1. startup defaults from `registerPerk`
+2. the matching `perks.toml` entry
+3. incoming data from the current PMMO trigger/context
+4. output already produced by earlier perks in the same execution pass
+
+If the merged tag contains `skill`, PMMO also injects a resolved `level` field for the current player.
+
+`ctx.getSettings()` reads this merged tag.
+
+## Lifecycle Timeline
+
+This is the shortest way to think about the callback functions:
+
+| Stage | Main function | What you usually read | What you usually write | Survives into later stages? |
+| --- | --- | --- | --- | --- |
+| setup | builder methods such as `withSkill(...)`, `withInt(...)`, `defaults(...)` | nothing at runtime yet | startup default tag | yes, as part of `ctx.getSettings()` |
+| activation check | `conditions(ctx)` | `ctx.getSettings()` | boolean return only | no new tag data by itself |
+| activation | `start(ctx)` | `ctx.getSettings()` and `ctx.getResult()` | persistent state in `ctx.getSettings()`, one-shot output in `ctx.getResult()` | `getSettings()`: yes, `getResult()`: only for the current PMMO execution |
+| ticking | `tick(ctx)` | `ctx.getSettings()`, `ctx.getElapsedTicks()` | usually `ctx.getSettings()` if you own private lifecycle state | yes |
+| shutdown | `stop(ctx)` | `ctx.getSettings()` | cleanup in `ctx.getSettings()` | only if you leave data there |
+| UI | `status(ctx)` | `ctx.getSettings()` | lines via `addLine(...)` or `addLines(...)` | UI text only |
+
+## Lifecycle Behavior
+
+### `conditions(ctx)`
+
+- Runs after PMMO's built-in `Perk.VALID_CONTEXT`
+- Adds extra activation checks
+- Reads from `ctx.getSettings()`
+
+### `start(ctx)`
+
+- Reads and may mutate `ctx.getSettings()`
+- Writes immediate execution output through `ctx.getResult()`
+- Data written to `ctx.getResult()` is merged back into the current perk execution
+- Mutations applied to `ctx.getSettings()` are copied into the tag used by later `tick()` and `stop()` callbacks
+
+### `tick(ctx)`
+
+- Reads and may mutate the persisted source tag through `ctx.getSettings()`
+- Receives elapsed ticks through `ctx.getElapsedTicks()`
+- PMMO ignores the return value of `tick()`
+
+### `stop(ctx)`
+
+- Reads and may mutate the same persisted source tag through `ctx.getSettings()`
+- PMMO ignores the return value of `stop()`
+
+### `status(ctx)`
+
+- Reads the same settings/source tag through `ctx.getSettings()`
+- Builds UI status lines through `addLine(...)` or `addLines(...)`
+
+## Lifecycle State
+
+PMMO does not expose a second hidden runtime state object for startup perks.
+
+For lifecycle state:
+
+- use `ctx.getSettings()` when data must remain available to later `tick()` or `stop()` callbacks
+- use `ctx.getResult()` only when `start()` must emit output back into the current perk execution
+
+## Complete Lifecycle Example
+
+```js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
+    .withSkill('combat')
+    .withCooldown(200)
+    .withDuration(100)
+    .withMinLevel(10)
+    .withInt('heal_interval', 20)
+    .withDouble('heal_amount', 1.0)
+    .defaults(tag => {
+      tag.putBoolean('active', false)
+      tag.putLong('started_at', 0)
+    })
+    .description('Heals the player while the perk stays active.')
+    .conditions(ctx => {
+      return ctx.getPlayer().getHealth() < ctx.getPlayer().getMaxHealth()
+    })
+    .start(ctx => {
+      ctx.getSettings().putBoolean('active', true)
+      ctx.getSettings().putLong('started_at', ctx.getPlayer().level().getGameTime())
+      ctx.getResult().putString('steady_mind_started', ctx.getPerkId())
+    })
+    .tick(ctx => {
+      const settings = ctx.getSettings()
+      const interval = settings.getIntOr('heal_interval', 20)
+      const amount = settings.getDoubleOr('heal_amount', 1.0)
+
+      if (settings.getBooleanOr('active', false) && ctx.getElapsedTicks() % interval === 0) {
+        ctx.getPlayer().heal(amount)
+      }
+    })
+    .stop(ctx => {
+      ctx.getSettings().putBoolean('active', false)
+    })
+    .status(ctx => {
+      const settings = ctx.getSettings()
+      ctx.clearLines()
+      ctx.addLine(`perk: ${ctx.getPerkId()}`)
+      ctx.addLine(`skill: ${settings.getSkill()}`)
+      ctx.addLine(`resolved level: ${settings.getResolvedLevel()}`)
+      ctx.addLine(`active: ${settings.getBooleanOr('active', false)}`)
+    })
+    .register()
+})
+```
+
+How to read that example:
+
+- `withInt('heal_interval', 20)` and `withDouble('heal_amount', 1.0)` create normal startup default fields.
+- `defaults(tag => {})` seeds private lifecycle keys before PMMO ever calls the perk.
+- `conditions(ctx)` only decides whether activation should continue.
+- `start(ctx)` writes two different things on purpose:
+  `ctx.getSettings()` stores `active` and `started_at` because `tick()` and `status()` still need them later.
+  `ctx.getResult()` writes `steady_mind_started` only for the current PMMO execution pass.
+- `tick(ctx)` shows the common pattern for stateful perks: read config and private lifecycle state from `ctx.getSettings()`, then use `ctx.getElapsedTicks()` for timing.
+- `stop(ctx)` is where you clean up or normalize the same persistent state.
+- `status(ctx)` is only for UI lines. It reads the same settings/source tag; it does not create extra lifecycle state.
+
+## Related
+
+- [Startup Registries](./registry)
+- [Phase Rules](./phases)
+- [Custom Perk Tags](./custom-perk-tags)
+- [Tag Model](../tag-model)

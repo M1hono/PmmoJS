@@ -26,8 +26,9 @@ public class NormalHandler {
 
     @SubscribeEvent
     public static void onXp(XpEvent event) {
-        var xpEvent = PMMOKubeJSEvents.XP.post(new XPEventJS(event));
-        if (xpEvent.interruptFalse()) {
+        var cancelled = PMMOKubeJSEvents.XP.post(new XPEventJS(event)).interruptFalse();
+        cancelled = PMMOKubeJSEvents.XP_BY_SKILL.post(new XPEventJS(event), event.skill).interruptFalse() || cancelled;
+        if (cancelled) {
             event.setCanceled(true);
         }
     }

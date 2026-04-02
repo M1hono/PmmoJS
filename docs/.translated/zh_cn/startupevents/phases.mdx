@@ -1,0 +1,110 @@
+---
+title: 启动阶段规则
+hide_meta: true
+---
+
+# 启动阶段规则
+
+这一页只回答一个问题：
+
+PmmoJS 的逻辑到底该放在哪一种脚本阶段？
+
+## 简短结论
+
+对于 Forge `1.20.1` + KubeJS：
+
+- `startup_scripts/` 用于注册与启动期 Forge 监听
+- `server_scripts/` 用于 PMMO 运行期逻辑与 ProbeJS 文档生成
+- `client_scripts/` 用于客户端辅助与界面逻辑
+
+## 实际分流
+
+放进 `startup_scripts/`：
+
+- `PmmoJS.registerPredicate(...)`
+- `PmmoJS.registerPerk(...)`
+- `PmmoHelper.registerRequirementData(...)`
+- `PmmoHelper.registerXpAwardData(...)`
+- `PmmoHelper.registerTriggerListener(...)`
+- `ForgeEvents.onEvent(...)`
+
+放进 `server_scripts/`：
+
+- `PmmoJS.trigger(...)`
+- `PmmoJS.internal(...)`
+- `PmmoJS.xp(...)`
+- 各类 PMMO 配置事件，例如 `PmmoJS.skillsConfig(...)`
+- 命令、测试脚本、运行期日志
+- `ProbeJSEvents.generateDoc(...)`
+
+放进 `client_scripts/`：
+
+- 只读 skill 显示Helper
+- 客户端界面逻辑
+
+如果你要写 `PmmoJS.registerPerk(...)`，请顺手阅读启动注册页。新的 perk builder 已经改成基于 context 的生命周期回调，而 `ctx.getSettings()` 的合并顺序也只在那一页完整说明。
+
+## 为什么要这样分
+
+`startup_scripts/` 处理的是“定义先存在”，也就是服务器真正进入玩法前就必须完成的注册。
+
+`server_scripts/` 处理的是“玩法中响应”，也就是会随着实际服务器运行、资源重载、事件触发而发生的逻辑。
+
+这也是最容易踩坑的地方：
+
+- `ForgeEvents.onEvent(...)` 在核心 KubeJS `1.20.1` 里是 startup 侧
+- `ProbeJSEvents.generateDoc(...)` 在当前运行环境里是 server 侧
+
+它们虽然都像是“全局事件 API”，但并不属于同一脚本阶段。
+
+## 合适的 startup 示例
+
+```js
+PmmoJS.registerPredicate(event => {
+  event.registerActionPredicate(PmmoHelper.id('minecraft:stick'), ReqType.WEAPON, (player, stack) => {
+    return player.experienceLevel >= 5
+  })
+})
+
+PmmoHelper.registerXpAwardData(ObjectType.ITEM, 'minecraft:bread', EventType.CONSUME, {
+  cooking: 2
+}, true)
+
+ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent', event => {
+  console.info(`[PmmoJS] raw login mirror: ${event.getEntity().getScoreboardName()}`)
+})
+```
+
+## 合适的 server 示例
+
+```js
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  if (event.hasPlayer()) {
+    event.addXpAward('mining', 5)
+  }
+})
+
+PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
+  if (!event.getContextBoolean('alreadyTracked')) {
+    event.addXpAward('alchemy', 10)
+  }
+})
+
+ProbeJSEvents.generateDoc(event => {
+  event.addSnippet('pmmojs.trigger.type', PmmoHelper.getTriggerTypeIds(), 'PmmoJS trigger ids')
+})
+```
+
+## 关于重载
+
+- 启动注册不适合当作运行期热重载玩法入口
+- 需要跟随服务端脚本重载的 PMMO 逻辑，应写在 `server_scripts/`
+- 如果把 startup 专属注册搬到 `server_scripts/`，常见结果就是脚本类型错误，或者生命周期错误
+
+## 一个简单判断法
+
+先问自己：这段代码到底在做什么？
+
+- 如果它在“定义 PMMO 数据或桥接注册”，放 startup
+- 如果它在“响应玩法过程”，放 server
+- 如果它在“生成 ProbeJS 文档”，放 server

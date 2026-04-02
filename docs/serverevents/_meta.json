@@ -1,5 +1,7 @@
 {
-  "normal.mdx": "Normal Events",
+  "normal.mdx": "Runtime Events",
+  "internal.mdx": "Internal Hooks",
   "config.mdx": "Config Events",
-  "settings.mdx": "Object Settings"
+  "settings.mdx": "PMMO Settings",
+  "reset-recipes.mdx": "Reset Defaults"
 }

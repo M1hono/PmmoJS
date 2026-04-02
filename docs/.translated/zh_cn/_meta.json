@@ -1,5 +1,6 @@
 {
-  "overview.mdx": "Mod Overview",
-  "startupevents": "Startup Events",
-  "serverevents": "Server Events"
+  "overview.mdx": "模组概览",
+  "tag-model.mdx": "标签模型",
+  "startupevents": "启动事件",
+  "serverevents": "服务端事件"
 }
