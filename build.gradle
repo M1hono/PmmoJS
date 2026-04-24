@@ -7,6 +7,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
+        classpath "org.tomlj:tomlj:1.1.1"
         classpath 'org.spongepowered:mixingradle:0.7.+'
         classpath 'com.google.code.gson:gson:2.8.9'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
@@ -32,15 +33,7 @@ configurations.all {
 }
 
 // Load properties from build.txt
-ext.configFile = file("build.txt")
-configFile.withReader {
-    def prop = new Properties()
-    prop.load(it)
-    project.ext.config = new ConfigSlurper().parse(prop)
-    project.ext.hasConfig = { key ->
-        return config.isSet(key)
-    }
-}
+apply from: 'gradle/template-config.gradle'
 
 wiki {
     // The name of the object (examplemod) should match the registered wiki project ID (if it exists).
@@ -178,32 +171,32 @@ dependencies {
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.3.2"))
     implementation(include("io.github.llamalad7:mixinextras-forge:0.3.2"))
 
-    if (hasConfig("jei_version") && !config.jei_version.isEmpty()) {
+    if (rootProject.ext.hasConfig.call("jei_version") && !config.jei_version.isEmpty()) {
         modCompileOnly("mezz.jei:jei-${config.mc_version}-common-api:${config.jei_version}")
         modCompileOnly("mezz.jei:jei-${config.mc_version}-forge-api:${config.jei_version}")
         modRuntimeOnly("mezz.jei:jei-${config.mc_version}-forge:${config.jei_version}")
     }
 
-    if (hasConfig("geckolib_version") && !config.geckolib_version.isEmpty()) {
+    if (rootProject.ext.hasConfig.call("geckolib_version") && !config.geckolib_version.isEmpty()) {
         modImplementation("software.bernie.geckolib:geckolib-neoforge-${config.mc_version}:${config.geckolib_version}")
         modImplementation("com.eliotlash.mclib:mclib:20")
     }
 
-    if (hasConfig("curios_version") && !config.curios_version.isEmpty()) {
+    if (rootProject.ext.hasConfig.call("curios_version") && !config.curios_version.isEmpty()) {
         modImplementation("top.theillusivec4.curios:curios-forge:${config.curios_version}")
         modRuntimeOnly("top.theillusivec4.curios:curios-forge:${config.curios_version}")
     }
 
-    if (hasConfig("playeranimator_version") && !config.playeranimator_version.isEmpty()) {
+    if (rootProject.ext.hasConfig.call("playeranimator_version") && !config.playeranimator_version.isEmpty()) {
         modImplementation("dev.kosmx.player-anim:player-animation-lib-forge:${config.playeranimator_version}")
         modRuntimeOnly("io.github.kosmx.bendy-lib:bendy-lib-forge:${config.bendylib_version}")
     }
 
-    if (hasConfig("pibrary_version") && !config.pibrary_version.isEmpty()) {
+    if (rootProject.ext.hasConfig.call("pibrary_version") && !config.pibrary_version.isEmpty()) {
         modImplementation("com.mihono.pickaid:pibrary:${config.pibrary_version}")
     }
 
-    if (hasConfig("pikubejscompat_version") && !config.pikubejscompat_version.isEmpty()) {
+    if (rootProject.ext.hasConfig.call("pikubejscompat_version") && !config.pikubejscompat_version.isEmpty()) {
         modImplementation("com.mihono.pickaid:pikubejscompat:${config.pikubejscompat_version}")
     }
 
@@ -321,16 +314,17 @@ jar {
 import java.nio.file.Files
 
 def incrementBuild = {
-    if (hasConfig("formal_version") && Boolean.parseBoolean(config.formal_version)) {
+    if (rootProject.ext.hasConfig.call("formal_version") && Boolean.parseBoolean(config.formal_version)) {
         def buildTxt = configFile.toPath()
         List<String> lines = Files.readAllLines(buildTxt)
         lines.replaceAll { String ln ->
-            if (ln.startsWith("mod_version")) {
-                def version = ln.split("=")[1]
+            if (ln ==~ /\s*version\s*=\s*".*"\s*/) {
+                def matcher = (ln =~ /"([^"]+)"/)
+                def version = matcher[0][1]
                 def dot = version.lastIndexOf('.') + 1
                 def newVersion = version.substring(0, dot)
                 def lastOne = Integer.parseInt(version.substring(dot)) + 1
-                return "mod_version=" + newVersion + lastOne
+                return 'version = "' + newVersion + lastOne + '"'
             }
             return ln
         }
@@ -353,7 +347,7 @@ publishing {
     }
 
     repositories {
-        if (hasConfig("maven_url") && !config.maven_url.isEmpty()) {
+        if (rootProject.ext.hasConfig.call("maven_url") && !config.maven_url.isEmpty()) {
             maven {
                 url config.maven_url
             }
