@@ -168,15 +168,94 @@ PmmoJS.antiCheeseConfig(event => {
 
 ## `PmmoJS.globalsConfig`
 
-Manage PMMO's global NBT paths and constants.
+Manage PMMO's global NBT path aliases and comparator aliases.
 
 ```js
 PmmoJS.globalsConfig(event => {
     event.addPath('durability', 'Damage')
-    event.addConstant('MAX_SKILL_LEVEL', '100')
+    event.addConstant('iron_material', 'tconstruct:iron')
     event.removePath('old_path')
     event.removeConstant('OLD_CONSTANT')
 })
 ```
+
+PMMO only reads these globals while evaluating NBT logic. They do not change normal requirements, normal XP awards, server modifiers, skill caps, or perk config.
+
+### How PMMO uses globals
+
+In PMMO 1.20.1, NBT logic evaluates each case in this order:
+
+1. For every configured path, PMMO expands `#alias` through `GlobalsConfig.PATHS`.
+2. PMMO reads values from the item's, block's, or entity's NBT with the expanded path.
+3. For every comparator, PMMO expands `#alias` through `GlobalsConfig.CONSTANTS`.
+4. PMMO compares the NBT value against the expanded comparator.
+5. If the comparison passes, PMMO applies the skill map on that criteria.
+
+That means globals are shorthand. They are not variables in every PMMO config field. Use them in NBT `paths` and NBT `comparators`.
+
+```js
+PmmoJS.globalsConfig(event => {
+  event.addPath('head_material', 'tic_materials[0]')
+  event.addConstant('manyullyn', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .nbtRequirement(ReqType.TOOL)
+    .newCase('#head_material')
+    .equals('#manyullyn', 'mining', 35)
+    .done()
+})
+```
+
+At runtime, PMMO reads `tic_materials[0]` from the pickaxe NBT and compares it to `tconstruct:manyullyn`.
+
+### Composite NBT example
+
+The main reason to use globals is to make long NBT rules readable across many objects. This example combines three ideas:
+
+- A base requirement on the item ID.
+- An additive NBT requirement for every material part.
+- A damage-based discount when the tool is heavily worn.
+
+```js
+const BehaviorToPrevious = Java.loadClass('harmonised.pmmo.core.nbt.BehaviorToPrevious')
+
+PmmoJS.globalsConfig(event => {
+  event.addPath('all_tic_materials', 'tic_materials[]')
+  event.addPath('damage', 'Damage')
+
+  event.addConstant('wood', 'tconstruct:wood')
+  event.addConstant('iron', 'tconstruct:iron')
+  event.addConstant('manyullyn', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'mining', 5)
+
+    .nbtRequirement(ReqType.TOOL)
+    .additive(true)
+    .newCase('#all_tic_materials')
+    .equals('#wood', 'mining', 1)
+    .equals('#iron', 'mining', 5)
+    .equals('#manyullyn', 'mining', 20)
+    .done()
+
+    .nbtRequirement(ReqType.TOOL)
+    .behavior(BehaviorToPrevious.SUB_FROM)
+    .newCase('#damage')
+    .greaterThan(800, 'mining', 10)
+    .done()
+})
+```
+
+The first NBT entry can add several material contributions because `tic_materials[]` reads every list entry and `.additive(true)` makes matching cases add together. The second NBT entry subtracts 10 mining requirement when `Damage` is greater than `800`.
+
+See [PMMO Authoring Workflow](../pmmo-workflow) for how globals fit with skills, object settings, perks, and runtime hooks.
 
 These config hooks are applied through the server reload path, so they stay compatible with PMMO config reloads and EMI tag synchronization.

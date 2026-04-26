@@ -1,0 +1,189 @@
+---
+title: PMMO 编写流程
+hide_meta: true
+---
+
+# PMMO 编写流程
+
+写 PmmoJS 脚本时，不要把每个 API 当成互不相干的方法。PMMO 更像一条数据流水线：
+
+1. 先决定整合包有哪些技能。
+2. 再决定 PMMO 默认数据是保留、部分清除，还是完全重建。
+3. 用对象数据配置物品、方块、实体、生物群系和维度。
+4. 只有当物品 ID 不足以区分规则时，才用 NBT 逻辑。
+5. 用 Perk 把技能等级转成实际游戏效果。
+6. 最后用运行时钩子处理静态数据表达不了的例外。
+
+## 先理解 PMMO 的几类数据
+
+| 概念 | 在 PMMO 里的含义 | PmmoJS 入口 |
+|---|---|---|
+| 技能 | `mining`、`combat` 或整合包自定义的等级轨道 | `PmmoJS.skillsConfig(...)` |
+| 对象数据 | 附着在物品、方块、实体、生物群系、维度上的需求、经验、加成等 | `PmmoJS.settings(...)` |
+| 服务端配置 | 最大等级、经验公式、死亡惩罚、队伍奖励、矿脉挖掘等全局规则 | `PmmoJS.serverConfig(...)` |
+| 自动赋值 | PMMO 根据物品、方块属性生成的默认值 | `PmmoJS.autoValueConfig(...)` |
+| 反作弊 | AFK、收益递减、经验标准化 | `PmmoJS.antiCheeseConfig(...)` |
+| Perk 条目 | 已注册 Perk 在某个技能和事件上的配置 | `PmmoJS.perksConfig(...)` |
+| 自定义 Perk 类型 | 整合包自己定义的新 Perk 行为 | `PmmoJS.registerPerk(...)` |
+| Trigger 上下文 | PMMO 处理 `EventType` 时产生的运行时数据 | `PmmoJS.trigger(...)` |
+| Internal 上下文 | 不走 trigger registry 的 PMMO 内部处理器数据 | `PmmoJS.internal(...)` |
+| NBT 逻辑 | 根据物品、方块或实体 NBT 条件决定需求、经验或加成 | `nbtRequirement(...)`、`nbtXp(...)`、`nbtBonus(...)` |
+
+核心原则是：**能用静态数据表达的规则，先写成 PMMO 数据；只有依赖实时状态的规则才放进运行时钩子。**
+
+## 执行顺序
+
+1. `startup_scripts/` 注册必须在世界加载前存在的结构：自定义 Perk 类型、谓词、直接 PMMO 数据注册、Forge 监听器。
+2. PMMO 读取自己的内置数据和 datapack 数据。
+3. PmmoJS 根据 `config/pmmojs-common.toml` 清除默认数据。
+4. `server_scripts/` 应用技能、settings、Perk 配置、server config、auto values、anti-cheese、globals。
+5. 游戏过程中，trigger、internal、xp、enchant、salvage 等运行时事件开始响应 PMMO 行为。
+
+如果不确定脚本该放哪里，先看 [启动阶段规则](./startupevents/phases)。
+
+## 该用哪个入口
+
+| 目标 | 用什么 | 原因 |
+|---|---|---|
+| 添加或删除技能 | `PmmoJS.skillsConfig(...)` | 后续 settings 和 perks 都要引用这些技能 |
+| 替换 PMMO 默认成长体系 | `pmmojs-common.toml` 加 `PmmoJS.settings(...)` | 先清默认数据，再重建整合包规则 |
+| 给某个物品、方块、实体设需求或经验 | `PmmoJS.settings(...)` | 这是 PMMO 对象数据的原生入口 |
+| 同一个物品 ID 根据 NBT 有不同规则 | `nbtRequirement(...)`、`nbtXp(...)`、`nbtBonus(...)` | PMMO 会在检查对象时读取 NBT |
+| 重复使用很长的 NBT 路径或比较值 | `PmmoJS.globalsConfig(...)` | PMMO 会在 NBT paths 和 comparators 里展开 `#别名` |
+| 调整已有 Perk | `PmmoJS.perksConfig(...)` | 你是在编辑 Perk 条目，不是在定义新行为 |
+| 创建新 Perk 行为 | `startup_scripts/` 里的 `PmmoJS.registerPerk(...)` | Perk 类型必须在配置引用前注册 |
+| 某个实时条件满足时加经验 | `PmmoJS.trigger(...)` | 条件依赖当前游戏状态 |
+| 让 PMMO 忽略某个内部处理器 | `PmmoJS.internal(...).skipPmmo()` | 只跳过 PMMO，不取消游戏行为 |
+| 直接取消底层游戏行为 | `PmmoJS.internal(...).deny()` | 同时取消 Forge 行为并跳过 PMMO |
+| 观察或拦截最终 XP 变化 | `PmmoJS.xp(...)` | 这个事件在 PMMO 改变玩家 XP 时触发 |
+
+## 一个完整功能通常这样写
+
+### 1. 定义技能
+
+```js
+PmmoJS.skillsConfig(event => {
+  event
+    .addSkill('engineering')
+    .withColor(0x5da7c8)
+    .withMaxLevel(100)
+    .build()
+})
+```
+
+### 2. 选择默认数据基线
+
+如果你要从零设计整合包成长，先在 `config/pmmojs-common.toml` 清除要重建的类别：
+
+```toml
+[disableDefaultSettings]
+requirements = true
+xpAwards = true
+itemExtras = true
+```
+
+如果只是补几条规则，就不要清默认数据。
+
+### 3. 注册普通对象数据
+
+```js
+PmmoJS.settings(event => {
+  event
+    .item('minecraft:diamond_pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'mining', 20)
+    .setXp(EventType.BLOCK_BREAK, 'mining', 12)
+})
+```
+
+这种规则只看注册 ID，不看 NBT。它应该放在 `settings`，不要放进 `trigger`。
+
+### 4. 用 globals 组织 NBT 规则
+
+TConstruct、Tetra、Silent Gear 这类模组经常是“一个物品 ID，材料存在 NBT 里”。这时用 globals 把长路径和长比较值命名。
+
+```js
+PmmoJS.globalsConfig(event => {
+  event.addPath('tool_head', 'tic_materials[0]')
+  event.addPath('tool_parts', 'tic_materials[]')
+
+  event.addConstant('iron_head', 'tconstruct:iron')
+  event.addConstant('manyullyn_head', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .nbtRequirement(ReqType.TOOL)
+    .newCase('#tool_head')
+    .equals('#iron_head', 'mining', 10)
+    .equals('#manyullyn_head', 'mining', 35)
+    .done()
+})
+```
+
+PMMO 实际执行时，会先把 `#tool_head` 展开成 `tic_materials[0]`，再从物品 NBT 里读值；然后把 `#manyullyn_head` 展开成 `tconstruct:manyullyn`，再做比较。
+
+### 5. 把多个 PMMO 面串起来
+
+下面这个例子同时用了技能、globals、settings、NBT 需求和运行时 trigger：
+
+```js
+PmmoJS.skillsConfig(event => {
+  event
+    .addSkill('engineering')
+    .withColor(0x5da7c8)
+    .withMaxLevel(100)
+    .build()
+})
+
+PmmoJS.globalsConfig(event => {
+  event.addPath('silent_parts', 'SGear_Data{}.Construction{}.Parts[].Item{}.tag{}.Materials[].ID')
+  event.addConstant('azure_silver', 'silentgear:azure_silver')
+  event.addConstant('crimson_iron', 'silentgear:crimson_iron')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('silentgear:pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'engineering', 8)
+    .setXp(EventType.BLOCK_BREAK, 'engineering', 4)
+
+    .nbtRequirement(ReqType.TOOL)
+    .additive(true)
+    .newCase('#silent_parts')
+    .equals('#azure_silver', 'engineering', 12)
+    .equals('#crimson_iron', 'engineering', 18)
+    .done()
+})
+
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (player && player.stages.has('engineering_trial')) {
+    event.addXpAward('engineering', 10)
+  }
+})
+```
+
+静态数据负责常规成长：基础需求、基础经验、材料需求。`trigger` 只负责任务阶段的临时奖励。
+
+## 常见错误
+
+- 把可重载的玩法逻辑放进 `startup_scripts/`。除非你在注册类型，否则优先放 `server_scripts/`。
+- 用 `PmmoJS.trigger(...)` 写固定需求。固定需求应该写进 `PmmoJS.settings(...)`。
+- 修改已有 PMMO 或原版数据时忘记 `.override(true)`。
+- 以为 globals 是全局变量。它只在 NBT `paths` 和 NBT `comparators` 中展开 `#别名`。
+- 把自定义 Perk 类型写进 `server_scripts/`。Perk 类型在启动脚本注册，Perk 条目在服务端脚本配置。
+- 直接在 `PmmoJS.xp(...)` 里重写所有经验规则。通常先用 settings 表达静态经验，XP hook 只处理最终事件。
+
+## 验证流程
+
+1. 安装 ProbeJS 或 ProbeJS Legacy。
+2. 进入世界后运行 `/probejs dump`。
+3. 用生成的类型补全选择 `EventType`、`ReqType`、`PMMOInternalType`，不要靠猜。
+4. 每次改脚本后 reload。
+5. 一次只测一个行为：需求门槛、经验奖励、NBT 分支、Perk 激活、运行时 hook。
+
+详见 [ProbeJS 类型生成](./probejs)。

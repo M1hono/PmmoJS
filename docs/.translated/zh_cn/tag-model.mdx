@@ -5,131 +5,296 @@ hide_meta: true
 
 # Tag 模型
 
-PmmoJS 在多个不同的地方使用 NBT tag。光看 Perk 系统，你就能在至少四种不同的场景中见到 tag。这一页解释每种 tag 是干什么的，以及什么时候该用哪一种。
+PmmoJS 会暴露 PMMO 的 NBT tag，因为 PMMO 本身就是用 tag 在对象数据、trigger、perk 和 XP 奖励之间传递信息。不要只把它们看成同一种 `CompoundTag`。同一个类型在不同入口里可能代表“静态配置”“当前事件上下文”“perk 生命周期状态”或“一次性输出”。
 
-## 一句话总结
+这一页基于 PMMO 1.20.1 源码中的 `PerkRegistry.executePerk`、`EventTriggerRegistry.executeEventListeners`、`TagUtils.mergeTags`、`APIUtils.serializeAwardMap`，以及 PmmoJS 的 `PerkTagJS`、`PMMOTriggerEventJS`、`PMMOInternalEventJS` 包装类。
 
-PmmoJS 中的 tag 分为两大类：
+## 数据流图
 
-- **静态 tag** 定义数据，在游戏会话之间持久存在。例如：Perk 启动默认值、Perk 配置条目。
-- **运行时 tag** 承载单次执行路径的实时状态，执行路径结束后就消失。例如：触发器上下文、内部钩子上下文、Perk 执行设置。
+大多数 PMMO 游戏流程可以理解成这样：
 
-最重要的规则：当 tag 需要供后续生命周期阶段（如 `tick()` 或 `stop()`）使用时，写入 `ctx.getSettings()`。当 tag 只在当前执行趟次中有意义时，写入 `ctx.getResult()`。
+```text
+settings / perks config / startup defaults
+        |
+        v
+PMMO 事件处理器构建输入 CompoundTag
+        |
+        v
+trigger listener 修改或返回运行时上下文
+        |
+        v
+PMMO 为每个 perk 构建合并后的 settings tag
+        |
+        v
+perk start 可以给后续 perk 写入 result output
+        |
+        v
+PMMO 计算 XP、需求、伤害、速度或其他最终效果
+        |
+        v
+xp hook 观察最终 XP 事件上下文
+```
 
-## Tag 出现的场景
+`globalsConfig` 不在这条运行时 tag 流里。PMMO 只在求值 NBT 逻辑时使用它：`paths` 在读取对象 NBT 前展开 `#别名`，`constants` 在比较值前展开 `#别名`。
 
-| 系统 | API | Tag 类型 | 生存期 |
-|---|---|---|---|
-| 启动 Perk 注册 | `PmmoJS.registerPerk(...)` | `PerkTagJS`（封装 `CompoundTag`） | 静态 —— 成为 Perk 的默认设置 |
-| Perk 执行回调 | `ctx.getSettings()`、`ctx.getResult()` | `PerkTagJS` | 运行时 —— 每次 Perk 执行时全新构建 |
-| 触发器钩子 | `PmmoJS.trigger(...)` | 可变 `CompoundTag` 上下文 | 运行时 —— 一次触发器调度 |
-| 内部钩子 | `PmmoJS.internal(...)` | 可变 `CompoundTag` 上下文 | 运行时 —— 一次内部处理器调度 |
-| XP 事件 | `PmmoJS.xp(...)` | 原始 `CompoundTag` | 运行时 —— 一次 XP 事件 |
-| Perk 配置编辑 | `PmmoJS.perksConfig(...)` | 静态 `CompoundTag` 条目 | 静态 —— 存储在 PMMO 的配置中 |
-| 直接触发器监听器 | `PmmoHelper.registerTriggerListener(...)` | 原始 `CompoundTag` | 运行时 —— 一次监听器调用 |
+## 最重要的规则
 
-## Perk tag 详解
+数据应该写到生命周期匹配的位置：
 
-当你用 `PmmoJS.registerPerk(...)` 注册 Perk 时，`withSkill(...)`、`withCooldown(...)`、`withInt(...)` 等构建器方法会把值写入**启动默认 tag**。这个 tag 定义了 Perk 的初始配置。
-
-在运行时，PMMO 会为每次 Perk 执行构建一个**合并后的设置 tag**，按以下顺序组合数据来源：
-
-1. 你在 `registerPerk` 中设置的启动默认值
-2. `perks.toml` 中匹配的条目（如果有的话）
-3. 当前 PMMO 事件传入的数据
-4. 同一执行趟次中更早 Perk 的输出
-
-如果合并后的 tag 中包含 `skill` 字段，PMMO 还会把玩家当前在该技能上的等级作为 `level` 字段注入。
-
-这个合并后的 tag 就是你在 Perk 回调中通过 `ctx.getSettings()` 访问的内容。
-
-### 各回调能做什么
-
-| 回调 | 通常读取的内容 | 通常写入的内容 |
+| 需求 | 写到哪里 | 原因 |
 |---|---|---|
-| `conditions(ctx)` | `ctx.getSettings()` | 返回 `true` 或 `false` |
-| `start(ctx)` | `ctx.getSettings()` | 持久状态写入 `ctx.getSettings()`，一次性输出写入 `ctx.getResult()` |
-| `tick(ctx)` | `ctx.getSettings()`、`ctx.getElapsedTicks()` | 通常写入 `ctx.getSettings()` 存放私有生命周期状态 |
-| `stop(ctx)` | `ctx.getSettings()` | 清理逻辑写入 `ctx.getSettings()` |
-| `status(ctx)` | `ctx.getSettings()` | 通过 `addLine(...)` 或 `addLines(...)` 输出 UI 文本行 |
+| 物品、方块、实体、生物群系或维度上的稳定规则 | `PmmoJS.settings(...)` | PMMO 能把它当作正常对象数据加载和求值 |
+| 可复用的 NBT 路径或比较值别名 | `PmmoJS.globalsConfig(...)` | PMMO 只会在 NBT paths 和 comparators 中展开 globals |
+| 自定义 perk 的可配置参数 | `PmmoJS.registerPerk(...).withInt(...)`、`.defaults(...)`，必要时再用 `PmmoJS.perksConfig(...)` | PMMO 会在回调运行前合并默认值和 perk 配置 |
+| `tick()` 或 `stop()` 后续要读的状态 | `ctx.getSettings()` | PMMO 会把 settings tag 的副本放入 active tick schedule |
+| 同一执行趟次中给后续 perk 看的输出 | `start()` 内的 `ctx.getResult()` | PMMO 会把 start result 合并进本次执行输出 |
+| 单次 PMMO trigger 的额外 XP 或取消标记 | `PmmoJS.trigger(...)` 的 context helper | 这个上下文只属于一次 trigger 调度 |
+| 不阻止游戏行为，只跳过 PMMO 内部处理器 | `PmmoJS.internal(...).skipPmmo()` | internal hook 控制 PMMO handler 是否继续 |
+| 取消底层 Forge 行为 | `PmmoJS.internal(...).deny()` | 它会设置动作取消并跳过 PMMO |
+| 观察最终 XP 变化 | `PmmoJS.xp(...)` | 这个事件在 PMMO 给玩家结算 XP 时触发 |
 
-只有 `start()` 能访问 `ctx.getResult()`。PMMO 会把你写入其中的内容合并回当前 Perk 执行中，供其他 Perk 读取。PMMO 会忽略 `tick()` 和 `stop()` 的返回值。
+规则如果是稳定的，先写成 PMMO 数据。只有静态数据不知道的实时状态，才放进运行时 tag。
 
-## PerkTagJS 参考
+## Tag 分类
 
-`PerkTagJS` 是启动 Perk 中使用的 tag 封装，提供带类型的 get/set 方法，无需直接操作原始 NBT。
+| 分类 | 例子 | 生命周期 |
+|---|---|---|
+| 静态对象数据 | 需求、XP 奖励、加成、效果、salvage、vein data | 存在 PMMO 数据/配置中 |
+| 静态 perk 数据 | startup defaults 和 `perks.toml` 条目 | 持续到 PMMO 重载配置 |
+| 运行时 trigger 上下文 | `PmmoJS.trigger(...)` 事件 context | 一次 trigger 调度 |
+| 运行时 internal 上下文 | `PmmoJS.internal(...)` 事件 context | 一次 internal hook 调度 |
+| Perk 执行 settings | `ctx.getSettings()` | 一次 perk 激活，之后是 active tick schedule 的副本 |
+| Perk result output | `ctx.getResult()` | 一次 `start()` 调用和当前 perk 执行趟次 |
+| XP 事件上下文 | `PmmoJS.xp(...).getContext()` | 一次 XP 事件 |
 
-### 读取值
+## Perk Settings 和 Result
 
-- `keys()` —— 列出所有键
-- `has(key)` —— 检查键是否存在
+PMMO 执行 perk 时，会为每个配置的 perk 条目构建一个新的 settings tag：
+
+1. 注册 perk 时的 `propertyDefaults()`。
+2. PMMO perk settings 中匹配的条目。
+3. 当前事件传入的数据。
+4. 同一执行趟次中更早 perk 的输出。
+5. 最后根据合并后的 `skill` 注入 `level`。
+
+PMMO 用 `CompoundTag.merge(...)` 构建这个 tag，所以越靠后的层会覆盖越靠前的同名标量值。这和 trigger 输出合并用的 `TagUtils.mergeTags(...)` 不是同一个规则。
+
+在 PmmoJS 回调里：
+
+- `ctx.getSettings()` 包装的是合并后的 source tag。
+- `ctx.getResult()` 只存在于 `start()`，初始为空。
+- PmmoJS 会把 `start()` 中的 `ctx.getResult()` 副本返回给 PMMO。
+- JS 友好的 `tick()` 和 `stop()` overload 会返回空 tag，所以生命周期状态要写进 `ctx.getSettings()`。
+
+这个区别很关键：
+
+```js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:heated_pickaxe', PMMOPerkSide.SERVER)
+    .withSkill('mining')
+    .withDuration(100)
+    .withInt('heat_per_tick', 1)
+    .start(ctx => {
+      // PMMO 会在 start() 返回后把 settings 复制进 active tick schedule，
+      // 所以 tick() 和 stop() 能读到这个值。
+      ctx.getSettings().putInt('heat', 0)
+
+      // 这是给同一执行趟次中后续 perk 看的“一次性输出”。
+      ctx.getResult().putBoolean('heated_pickaxe_started', true)
+    })
+    .tick(ctx => {
+      const settings = ctx.getSettings()
+      settings.putInt('heat', settings.getIntOr('heat', 0) + settings.getIntOr('heat_per_tick', 1))
+    })
+    .stop(ctx => {
+      ctx.getSettings().remove('heat')
+    })
+    .register()
+})
+```
+
+如果把 `heat` 写进 `ctx.getResult()`，`tick()` 读不到它。如果把 `heated_pickaxe_started` 只写进 `ctx.getSettings()`，同一执行趟次中后面的 perk 不会通过 PMMO 的 output merge 收到它。
+
+## PerkTagJS
+
+`PerkTagJS` 是 `CompoundTag` 的 JS 友好包装。
+
+读取：
+
+- `keys()`、`has(key)`、`hasCompound(key)`
 - `getString(key)`、`getStringOr(key, fallback)`
 - `getInt(key)`、`getIntOr(key, fallback)`
 - `getLong(key)`、`getLongOr(key, fallback)`
 - `getFloat(key)`、`getFloatOr(key, fallback)`
 - `getDouble(key)`、`getDoubleOr(key, fallback)`
 - `getBoolean(key)`、`getBooleanOr(key, fallback)`
-- `getOrCreateCompound(key)` —— 获取或创建嵌套的 compound
+- `getOrCreateCompound(key)`
 
-### 写入值
+写入：
 
-- `remove(key)` —— 删除键
-- `clear()` —— 删除全部
-- `putString(key, value)`
-- `putBoolean(key, value)`
-- `putInt(key, value)`
-- `putLong(key, value)`
-- `putFloat(key, value)`
-- `putDouble(key, value)`
+- `remove(key)`、`clear()`
+- `putString(key, value)`、`putBoolean(key, value)`
+- `putInt(key, value)`、`putLong(key, value)`
+- `putFloat(key, value)`、`putDouble(key, value)`
 - `putCompound(key, value)`
 - `putStringList(key, values)`
-- `putNumberList(key, values)` —— 将值存储为 double
-- `merge(value)` —— 将另一个 compound 的键合并到当前 compound
+- `putNumberList(key, values)`
+- `merge(value)`
+- `copy()`
 
-### PMMO 专用辅助方法
+PMMO 辅助读取：
 
-- `getSkill()` —— 此 Perk 关联的技能名称
-- `getResolvedLevel()` —— 玩家当前在该技能上的等级
-- `getCooldown()` —— Perk 的冷却时间（tick）
-- `getDuration()` —— Perk 的持续时间（tick）
-- `getChance()` —— Perk 的激活概率（0.0 到 1.0）
+- `getSkill()` 读取 `skill`。
+- `getResolvedLevel()` 读取注入后的 `level`。
+- `getCooldown()` 读取 `cooldown`。
+- `getDuration()` 读取 `duration`。
+- `getChance()` 读取 `chance`。
 
-## 触发器上下文 tag
+## 三种合并模型
 
-`PmmoJS.trigger(...)` 通过事件对象给你一个可变的 `CompoundTag`。生命周期很简单：
+PMMO 不是所有地方都用同一种合并规则。
 
-1. PMMO 准备一个触发器上下文 tag
-2. 你的 KubeJS 脚本读取并修改这个 tag
-3. 你的脚本返回后，修改后的 tag 回到 PMMO
-4. PMMO 可以继续使用这个 tag，包括将其传入 Perk 执行
+| 位置 | 合并行为 |
+|---|---|
+| `PerkRegistry.executePerk` 中的 perk source tag | `CompoundTag.merge(...)` 依次合并 defaults、config、incoming event data、prior perk output。后面的标量值覆盖前面的标量值。 |
+| `EventTriggerRegistry.executeEventListeners` 中的 trigger listener output | `TagUtils.mergeTags(...)` 会把同名数字相加。非数字同名键保留更早 output 的值。`is_cancelled` 额外按“只要 true 就保持 true”的逻辑处理。 |
+| PmmoJS XP helper | XP map 会通过 `APIUtils.serializeAwardMap(...)` 编码到 `serialized_award_map`。除非你完全匹配 PMMO codec 格式，否则不要手写这个 compound。 |
+| `PerkTagJS.merge(value)` | 调用的是 Minecraft 的 `CompoundTag.merge(...)`，不是 PMMO 会累加数字的 `TagUtils.mergeTags(...)`。 |
 
-推荐使用事件对象的 `getContext*` / `putContext*` 辅助方法，而不是直接编辑原始 tag。
+实际后果是：两个 trigger listener 都写入 int 类型的 `bonus_roll` 时，PMMO 的 trigger output 可以把它们相加；两个 perk source layer 都写入 `cooldown` 时，后写入的那层生效。
 
-XP 奖励辅助方法同样可用：`getXpAwards()`、`setXpAwards(map)`、`setXpAward(skill, amount)`、`addXpAward(skill, amount)`、`clearXpAwards()`。
+## Trigger Context
 
-要取消 PMMO 对本次触发器的处理，调用 `event.setCancelled(true)`。
+`PmmoJS.trigger(type, event => {})` 包装的是 PMMO trigger registry。规则依赖 PMMO `EventType` 的实时状态时用它。
 
-## 内部钩子上下文 tag
+```js
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (!player) return
 
-`PmmoJS.internal(...)` 的工作方式与触发器类似，但初始时只有一个新的空 `CompoundTag`。在脚本运行之前，桥接层可能会向该 tag 注入钩子专属的数据。
+  if (player.stages.has('festival_mining_bonus')) {
+    event.addXpAward('mining', 25)
+  }
 
-与触发器的主要区别：
+  if (player.isCreative()) {
+    event.setCancelled(true)
+  }
+})
+```
 
-- 内部钩子以空 tag 开始（触发器接收 PMMO 准备好的上下文）
-- 内部钩子有行动控制方法：`event.skipPmmo()`（跳过 PMMO 的处理器）、`event.deny()`（取消 Forge 动作并跳过 PMMO）
-- 部分钩子会收到桥接层注入的键：`EXPLOSION` 获得 `affectedBlockCount` 和 `affectedEntityCount`，`POTION_BREW` 获得 `alreadyTracked` 和 `markBrewed`
+优先使用包装方法：
 
-## 最佳实践
+- `getContext*` 和 `putContext*` 读写普通 context 字段。
+- `getXpAwards()`、`setXpAwards(map)`、`setXpAward(skill, amount)`、`addXpAward(skill, amount)`、`clearXpAwards()` 管理 XP map。
+- `setCancelled(true)` 告诉 PMMO 跳过这个 trigger 的处理。
 
-- 在 Perk 回调内使用 `PerkTagJS` 方法（如 `getIntOr`、`putBoolean`），而不是直接调用原始 NBT。
-- 使用 `ctx.getSettings()` 存放后续回调需要的状态。
-- 只在 `start()` 中使用 `ctx.getResult()` 存放应流入当前 PMMO 执行趟次的输出。
-- 对于触发器和内部钩子的上下文，使用事件对象上的 `getContext*` / `putContext*` 辅助方法。
-- 只有在 API 明确暴露原始 `CompoundTag` 时才直接使用它（例如 `PmmoJS.xp(...)` 或 `PmmoHelper.registerTriggerListener(...)`）。
+XP helper 存在的原因是 PMMO 会把 XP 奖励放在 `serialized_award_map` 下，而且这个 compound 必须由 `APIUtils.serializeAwardMap(...)` 生成。普通 JS 对象 `{ mining: 25 }` 不是 PMMO 期望的 NBT 形状。
+
+通过 `PmmoHelper.registerTriggerListener(...)` 注册的 raw direct listener 更底层。PMMO 期望返回的 tag 包含 `is_cancelled`，否则上游 registry 会把 listener 输出视为无效。除非你确实需要 startup-time 的直接注册，否则优先用 `PmmoJS.trigger(...)`。
+
+## Internal Context
+
+`PmmoJS.internal(type, event => {})` 覆盖的是不走 trigger registry 的 PMMO handler：维度旅行、登录、骑乘、活塞、爆炸、玩家死亡、酿造、睡眠等。
+
+Internal hook 初始会拿到一个新的空 `CompoundTag`。桥接层可能会在脚本运行前写入 hook 专属键：
+
+- `EXPLOSION`：`affectedBlockCount`、`affectedEntityCount`
+- `POTION_BREW`：`alreadyTracked`、`markBrewed`，有时还有 `serialized_award_map`
+
+Internal hook 用来控制 PMMO handler，不应该替代普通对象数据：
+
+```js
+PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
+  if (event.getContextBoolean('alreadyTracked')) {
+    return
+  }
+
+  event.addXpAward('alchemy', 10)
+  event.putContextBoolean('markBrewed', true)
+})
+```
+
+`event.skipPmmo()` 表示游戏行为继续，但 PMMO handler 跳过。`event.deny()` 会在可取消时取消被包装的 Forge 行为，并且跳过 PMMO。
+
+## XP Event Context
+
+`PmmoJS.xp(...)` 在 PMMO 改变玩家 XP 时触发。它的 `getContext()` 暴露 PMMO 原始 XP event context，所以适合做观察或很小范围的取消逻辑。不要把 XP hook 当成定义对象奖励的主入口。稳定奖励放在 `PmmoJS.settings(...)`；运行时追加通常放在 `PmmoJS.trigger(...)` 或 `PmmoJS.internal(...)`，并使用 XP award helper。
+
+```js
+PmmoJS.xp(event => {
+  if (event.getSkill() === 'mining' && event.isLevelUp()) {
+    event.getEntity().tell(`Mining level: ${event.endLevel()}`)
+  }
+})
+```
+
+## 复合示例
+
+这个例子把对象数据、NBT globals、自定义 perk 和运行时 trigger 串起来，但每一层只负责自己的事。实际整合包里要按脚本阶段拆开写。
+
+```js
+// startup_scripts/pmmo_perks.js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:manyullyn_focus', PMMOPerkSide.SERVER)
+    .withSkill('mining')
+    .withDuration(80)
+    .withInt('bonus_xp', 10)
+    .start(ctx => {
+      ctx.getSettings().putBoolean('active', true)
+      ctx.getResult().putBoolean('manyullyn_focus_active', true)
+    })
+    .stop(ctx => {
+      ctx.getSettings().putBoolean('active', false)
+    })
+    .register()
+})
+```
+
+```js
+// server_scripts/pmmo_progression.js
+PmmoJS.globalsConfig(event => {
+  event.addPath('tool_materials', 'tic_materials[]')
+  event.addConstant('manyullyn', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'mining', 5)
+    .setXp(EventType.BLOCK_BREAK, 'mining', 4)
+
+    .nbtRequirement(ReqType.TOOL)
+    .additive(true)
+    .newCase('#tool_materials')
+    .equals('#manyullyn', 'mining', 25)
+    .done()
+})
+
+PmmoJS.perksConfig(event => {
+  event
+    .addPerk(EventType.BLOCK_BREAK, 'kubejs:manyullyn_focus', 'mining')
+    .withMinLevel(30)
+    .build()
+})
+
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (player && player.stages.has('mining_trial')) {
+    event.addXpAward('mining', 10)
+  }
+})
+```
+
+静态 settings 负责普通成长。`globalsConfig` 只让 NBT 规则可读。自定义 perk 把生命周期状态放在 `ctx.getSettings()`，把一次性标记放在 `ctx.getResult()`。trigger 只处理任务阶段带来的临时 XP 加成。
 
 ## 相关页面
 
-- [启动 Perk 注册](./startupevents/perks)
-- [自定义 Perk Tag](./startupevents/custom-perk-tags)
+- [PMMO 编写流程](./pmmo-workflow)
+- [PMMO Settings](./serverevents/settings)
+- [Config Events](./serverevents/config#pmmojsglobalsconfig)
+- [Perk 注册](./startupevents/perks)
 - [运行时事件](./serverevents/normal)
-- [内部钩子](./serverevents/internal)
+- [Internal Hooks](./serverevents/internal)

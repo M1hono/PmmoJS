@@ -5,124 +5,296 @@ hide_meta: true
 
 # Tag Model
 
-PmmoJS uses NBT tags in several different places. If you look at the perk system alone, you will see tags in at least four different roles. This page explains what each tag does and when to use which one.
+PmmoJS exposes PMMO's NBT tags because PMMO uses tags as the hand-off format between object data, triggers, perks, and XP awards. Treat these tags as data packets with different lifetimes. The same `CompoundTag` type can mean "static config", "current event context", "perk lifecycle state", or "one-shot output" depending on where you see it.
 
-## Tag categories
+This page is source-backed by PMMO 1.20.1's `PerkRegistry.executePerk`, `EventTriggerRegistry.executeEventListeners`, `TagUtils.mergeTags`, `APIUtils.serializeAwardMap`, and the PmmoJS wrappers `PerkTagJS`, `PMMOTriggerEventJS`, and `PMMOInternalEventJS`.
 
-You will encounter two main categories of tags in PmmoJS:
+## Data Flow Map
 
-- **Static tags** define data and persist between game sessions. Examples: perk startup defaults, perk config entries.
-- **Runtime tags** carry live state for one execution path and disappear after that path finishes. Examples: trigger context, internal hook context, perk execution settings.
+Most PMMO gameplay paths look like this:
 
-The most important rule: when a tag is meant for later lifecycle stages (like `tick()` or `stop()`), write to `ctx.getSettings()`. When a tag is meant only for the current execution pass, write to `ctx.getResult()`.
+```text
+settings / perks config / startup defaults
+        |
+        v
+PMMO event handler builds an input CompoundTag
+        |
+        v
+trigger listeners may mutate or return runtime context
+        |
+        v
+PMMO builds each perk's merged settings tag
+        |
+        v
+perk start may write result output for later perks
+        |
+        v
+PMMO computes XP, requirements, damage, speed, or other final effects
+        |
+        v
+xp hooks observe the final XP event context
+```
 
-## Where tags appear
+`globalsConfig` is not a runtime tag in this flow. PMMO uses it while evaluating NBT logic: `paths` expands `#alias` before reading object NBT, and `constants` expands `#alias` before comparing a value.
 
-| System | API | Tag type | Lifetime |
-|---|---|---|---|
-| Startup perk registration | `PmmoJS.registerPerk(...)` | `PerkTagJS` (wraps `CompoundTag`) | Static — becomes the perk's default settings |
-| Perk execution callbacks | `ctx.getSettings()`, `ctx.getResult()` | `PerkTagJS` | Runtime — built fresh for each perk execution |
-| Trigger hooks | `PmmoJS.trigger(...)` | Mutable `CompoundTag` context | Runtime — one trigger dispatch |
-| Internal hooks | `PmmoJS.internal(...)` | Mutable `CompoundTag` context | Runtime — one internal handler dispatch |
-| XP event | `PmmoJS.xp(...)` | Raw `CompoundTag` | Runtime — one XP event |
-| Perk config editing | `PmmoJS.perksConfig(...)` | Static `CompoundTag` entries | Static — stored in PMMO's config |
-| Direct trigger listeners | `PmmoHelper.registerTriggerListener(...)` | Raw `CompoundTag` | Runtime — one listener invocation |
+## The Main Rule
 
-## Perk tags in depth
+Write data where its lifetime matches the problem:
 
-When you register a perk with `PmmoJS.registerPerk(...)`, the builder methods like `withSkill(...)`, `withCooldown(...)`, and `withInt(...)` write values into a **startup default tag**. This tag defines the perk's initial configuration.
-
-At runtime, PMMO builds a **merged settings tag** for each perk execution by combining these sources in order:
-
-1. Your startup defaults from `registerPerk`
-2. The matching entry from `perks.toml` (if any)
-3. Incoming data from the current PMMO event
-4. Output from earlier perks in the same execution pass
-
-If the merged tag contains a `skill` field, PMMO also injects the current player's level for that skill as a `level` field.
-
-This merged tag is what you access through `ctx.getSettings()` inside your perk callbacks.
-
-### What each callback can do
-
-| Callback | What you typically read | What you typically write |
+| Need | Write here | Why |
 |---|---|---|
-| `conditions(ctx)` | `ctx.getSettings()` | Return `true` or `false` |
-| `start(ctx)` | `ctx.getSettings()` | Persistent state in `ctx.getSettings()`, one-shot output in `ctx.getResult()` |
-| `tick(ctx)` | `ctx.getSettings()`, `ctx.getElapsedTicks()` | Usually `ctx.getSettings()` for private lifecycle state |
-| `stop(ctx)` | `ctx.getSettings()` | Cleanup in `ctx.getSettings()` |
-| `status(ctx)` | `ctx.getSettings()` | UI lines via `addLine(...)` or `addLines(...)` |
+| A stable pack rule for items, blocks, entities, biomes, or dimensions | `PmmoJS.settings(...)` | PMMO can load and evaluate it as normal object data |
+| A reusable NBT path or comparator alias | `PmmoJS.globalsConfig(...)` | PMMO only expands globals inside NBT paths and NBT comparators |
+| A configurable custom perk knob | `PmmoJS.registerPerk(...).withInt(...)`, `.defaults(...)`, then optionally `PmmoJS.perksConfig(...)` | PMMO merges defaults and perk config before callbacks run |
+| State that `tick()` or `stop()` must read later | `ctx.getSettings()` | PMMO stores a copy of the settings tag in the active tick schedule |
+| Output for later perks in the same execution pass | `ctx.getResult()` inside `start()` | PMMO merges the start result into the execution output |
+| Extra XP or cancellation for one PMMO trigger | `PmmoJS.trigger(...)` context helpers | This context belongs to one trigger dispatch |
+| Skip PMMO's handler without blocking the game action | `PmmoJS.internal(...).skipPmmo()` | Internal hooks control PMMO handler execution |
+| Cancel the wrapped Forge action | `PmmoJS.internal(...).deny()` | This sets action cancellation and skips PMMO |
+| Inspect final XP changes | `PmmoJS.xp(...)` | This fires when PMMO applies XP to a player |
 
-Only `start()` has access to `ctx.getResult()`. PMMO merges whatever you write there back into the current perk execution for other perks to read. PMMO ignores the return values of `tick()` and `stop()`.
+If a rule is stable, write it as PMMO data first. Use runtime tags only for live state that static data cannot know.
 
-## PerkTagJS reference
+## Tag Categories
 
-`PerkTagJS` is the tag wrapper used in startup perks. It provides typed get/set methods instead of raw NBT manipulation.
+| Category | Examples | Lifetime |
+|---|---|---|
+| Static object data | Requirements, XP awards, bonuses, effects, salvage, vein data | Stored in PMMO data/config |
+| Static perk data | Startup defaults and `perks.toml` entries | Stored until PMMO reloads config |
+| Runtime trigger context | `PmmoJS.trigger(...)` event context | One trigger dispatch |
+| Runtime internal context | `PmmoJS.internal(...)` event context | One internal hook dispatch |
+| Perk execution settings | `ctx.getSettings()` | One perk activation, then the active tick schedule copy |
+| Perk result output | `ctx.getResult()` | One `start()` call and the current perk execution pass |
+| XP event context | `PmmoJS.xp(...).getContext()` | One XP event |
 
-### Reading values
+## Perk Settings vs Result
 
-- `keys()` — list all keys
-- `has(key)` — check if a key exists
+When PMMO executes perks, it builds a fresh settings tag for each configured perk entry:
+
+1. The registered perk's `propertyDefaults()`.
+2. The matching perk config entry from PMMO's perk settings.
+3. The incoming event data.
+4. Output from earlier perks in the same execution pass.
+5. A final injected `level` key based on the merged `skill` key.
+
+PMMO builds that tag with `CompoundTag.merge(...)`, so later layers overwrite earlier scalar keys. This is different from `TagUtils.mergeTags(...)`, which is used by trigger output merging.
+
+Inside PmmoJS callbacks:
+
+- `ctx.getSettings()` wraps the merged source tag.
+- `ctx.getResult()` exists only in `start()` and starts empty.
+- PmmoJS returns a copy of `ctx.getResult()` from `start()`.
+- PmmoJS returns empty tags from the JS-friendly `tick()` and `stop()` overloads, so write lifecycle state to `ctx.getSettings()`.
+
+This distinction matters:
+
+```js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:heated_pickaxe', PMMOPerkSide.SERVER)
+    .withSkill('mining')
+    .withDuration(100)
+    .withInt('heat_per_tick', 1)
+    .start(ctx => {
+      // This survives into tick() and stop() because PMMO copies settings
+      // into the active tick schedule after start() returns.
+      ctx.getSettings().putInt('heat', 0)
+
+      // This is one-shot output for later perks in this same execution pass.
+      ctx.getResult().putBoolean('heated_pickaxe_started', true)
+    })
+    .tick(ctx => {
+      const settings = ctx.getSettings()
+      settings.putInt('heat', settings.getIntOr('heat', 0) + settings.getIntOr('heat_per_tick', 1))
+    })
+    .stop(ctx => {
+      ctx.getSettings().remove('heat')
+    })
+    .register()
+})
+```
+
+If you put `heat` in `ctx.getResult()`, `tick()` would not see it. If you put `heated_pickaxe_started` in `ctx.getSettings()`, later perks in the same execution pass would not receive it through PMMO's output merge.
+
+## PerkTagJS
+
+`PerkTagJS` wraps `CompoundTag` with JS-friendly typed helpers.
+
+Reading:
+
+- `keys()`, `has(key)`, `hasCompound(key)`
 - `getString(key)`, `getStringOr(key, fallback)`
 - `getInt(key)`, `getIntOr(key, fallback)`
 - `getLong(key)`, `getLongOr(key, fallback)`
 - `getFloat(key)`, `getFloatOr(key, fallback)`
 - `getDouble(key)`, `getDoubleOr(key, fallback)`
 - `getBoolean(key)`, `getBooleanOr(key, fallback)`
-- `getOrCreateCompound(key)` — get or create a nested compound
+- `getOrCreateCompound(key)`
 
-### Writing values
+Writing:
 
-- `remove(key)` — delete a key
-- `clear()` — delete everything
-- `putString(key, value)`
-- `putBoolean(key, value)`
-- `putInt(key, value)`
-- `putLong(key, value)`
-- `putFloat(key, value)`
-- `putDouble(key, value)`
+- `remove(key)`, `clear()`
+- `putString(key, value)`, `putBoolean(key, value)`
+- `putInt(key, value)`, `putLong(key, value)`
+- `putFloat(key, value)`, `putDouble(key, value)`
 - `putCompound(key, value)`
 - `putStringList(key, values)`
-- `putNumberList(key, values)` — stores values as doubles
-- `merge(value)` — merge another compound's keys into this one
+- `putNumberList(key, values)`
+- `merge(value)`
+- `copy()`
 
-### PMMO-specific helpers
+PMMO helper reads:
 
-- `getSkill()` — the skill name assigned to this perk
-- `getResolvedLevel()` — the current player's level in that skill
-- `getCooldown()` — the perk's cooldown in ticks
-- `getDuration()` — the perk's duration in ticks
-- `getChance()` — the perk's activation chance (0.0 to 1.0)
+- `getSkill()` reads `skill`.
+- `getResolvedLevel()` reads injected `level`.
+- `getCooldown()` reads `cooldown`.
+- `getDuration()` reads `duration`.
+- `getChance()` reads `chance`.
 
-## Trigger context tags
+## Merge Models
 
-`PmmoJS.trigger(...)` gives you a mutable `CompoundTag` through the event object. The lifecycle is straightforward:
+PMMO does not use one merge rule everywhere.
 
-1. PMMO prepares a trigger context tag
-2. Your KubeJS script reads and mutates that tag
-3. After your script returns, the mutated tag goes back to PMMO
-4. PMMO can continue using that tag, including feeding it into perk execution
+| Place | Merge behavior |
+|---|---|
+| Perk source tag in `PerkRegistry.executePerk` | `CompoundTag.merge(...)` layers defaults, config, incoming event data, and prior perk output. Later scalar values overwrite earlier scalar values. |
+| Trigger listener output in `EventTriggerRegistry.executeEventListeners` | `TagUtils.mergeTags(...)` adds numeric values with the same key. For non-numeric duplicate keys, the earlier output value stays. `is_cancelled` is handled as a boolean "once true, stay true" flag. |
+| PmmoJS XP helpers | Award maps are encoded with `APIUtils.serializeAwardMap(...)` under `serialized_award_map`. Do not hand-build that compound unless you are matching PMMO's codec format exactly. |
+| `PerkTagJS.merge(value)` | Delegates to Minecraft's `CompoundTag.merge(...)`, not PMMO's numeric-summing `TagUtils.mergeTags(...)`. |
 
-Use the event's `getContext*` / `putContext*` helper methods instead of editing the raw tag directly.
+Practical result: if two trigger listeners both write `bonus_roll` as an int, PMMO's trigger output can sum them. If two perk source layers write `cooldown`, the later layer wins.
 
-XP award helpers are also available: `getXpAwards()`, `setXpAwards(map)`, `setXpAward(skill, amount)`, `addXpAward(skill, amount)`, `clearXpAwards()`.
+## Trigger Context
 
-To cancel PMMO's processing for this trigger, call `event.setCancelled(true)`.
+`PmmoJS.trigger(type, event => {})` wraps PMMO's trigger registry. Use it when a rule depends on live state from a PMMO `EventType`.
 
-## Internal hook context tags
+```js
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (!player) return
 
-`PmmoJS.internal(...)` works similarly to triggers, but starts with a new empty `CompoundTag`. The bridge may seed that tag with hook-specific data before your script runs.
+  if (player.stages.has('festival_mining_bonus')) {
+    event.addXpAward('mining', 25)
+  }
 
-Key differences from triggers:
+  if (player.isCreative()) {
+    event.setCancelled(true)
+  }
+})
+```
 
-- Internal hooks start with an empty tag (triggers receive PMMO's prepared context)
-- Internal hooks have action control methods: `event.skipPmmo()` (skip PMMO's handler), `event.deny()` (cancel the Forge action and skip PMMO)
-- Some hooks get bridge-seeded keys: `EXPLOSION` gets `affectedBlockCount` and `affectedEntityCount`, `POTION_BREW` gets `alreadyTracked` and `markBrewed`
+Use the wrapper helpers:
 
-## Best practices
+- `getContext*` and `putContext*` for ordinary context fields.
+- `getXpAwards()`, `setXpAwards(map)`, `setXpAward(skill, amount)`, `addXpAward(skill, amount)`, `clearXpAwards()` for XP maps.
+- `setCancelled(true)` to tell PMMO to skip that trigger's processing.
 
-- Use `PerkTagJS` methods (like `getIntOr`, `putBoolean`) instead of raw NBT calls inside perk callbacks.
-- Use `ctx.getSettings()` for state that later callbacks will need.
-- Use `ctx.getResult()` only in `start()` for output that should flow into the current PMMO execution pass.
-- For trigger and internal hook context, use the `getContext*` / `putContext*` helper methods on the event object.
-- Only use raw `CompoundTag` when the API intentionally exposes it (e.g., `PmmoJS.xp(...)` or `PmmoHelper.registerTriggerListener(...)`).
+The XP helper methods exist because PMMO stores XP awards under `serialized_award_map`, a compound produced by `APIUtils.serializeAwardMap(...)`. A plain object like `{ mining: 25 }` is not the on-wire NBT shape PMMO expects.
+
+Raw direct listeners registered with `PmmoHelper.registerTriggerListener(...)` are lower-level. PMMO expects the returned tag to include `is_cancelled`; otherwise the upstream registry treats the listener output as invalid. Prefer `PmmoJS.trigger(...)` unless you need direct startup-time registration.
+
+## Internal Context
+
+`PmmoJS.internal(type, event => {})` covers PMMO handler paths that do not go through the trigger registry: dimension travel, login, mount, piston, explosion, player death, potion brewing, and sleep.
+
+Internal hooks start with a new empty `CompoundTag`. The bridge may seed hook-specific keys before your script runs:
+
+- `EXPLOSION`: `affectedBlockCount`, `affectedEntityCount`
+- `POTION_BREW`: `alreadyTracked`, `markBrewed`, and sometimes `serialized_award_map`
+
+Use internal hooks to control PMMO's handler, not to replace normal object data:
+
+```js
+PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
+  if (event.getContextBoolean('alreadyTracked')) {
+    return
+  }
+
+  event.addXpAward('alchemy', 10)
+  event.putContextBoolean('markBrewed', true)
+})
+```
+
+`event.skipPmmo()` means the game action continues but PMMO's handler is skipped. `event.deny()` cancels the wrapped Forge action when it can be cancelled and also skips PMMO.
+
+## XP Event Context
+
+`PmmoJS.xp(...)` fires when PMMO changes a player's XP. Its `getContext()` exposes PMMO's raw XP event context, so use it for inspection or carefully targeted cancellation. Do not use XP hooks as the main way to define object rewards. Stable rewards belong in `PmmoJS.settings(...)`; runtime additions usually belong in `PmmoJS.trigger(...)` or `PmmoJS.internal(...)` through the XP award helpers.
+
+```js
+PmmoJS.xp(event => {
+  if (event.getSkill() === 'mining' && event.isLevelUp()) {
+    event.getEntity().tell(`Mining level: ${event.endLevel()}`)
+  }
+})
+```
+
+## Composite Example
+
+This example combines object data, NBT globals, a custom perk, and a runtime trigger without mixing their responsibilities. In a real pack, split it by script phase.
+
+```js
+// startup_scripts/pmmo_perks.js
+PmmoJS.registerPerk(event => {
+  event
+    .create('kubejs:manyullyn_focus', PMMOPerkSide.SERVER)
+    .withSkill('mining')
+    .withDuration(80)
+    .withInt('bonus_xp', 10)
+    .start(ctx => {
+      ctx.getSettings().putBoolean('active', true)
+      ctx.getResult().putBoolean('manyullyn_focus_active', true)
+    })
+    .stop(ctx => {
+      ctx.getSettings().putBoolean('active', false)
+    })
+    .register()
+})
+```
+
+```js
+// server_scripts/pmmo_progression.js
+PmmoJS.globalsConfig(event => {
+  event.addPath('tool_materials', 'tic_materials[]')
+  event.addConstant('manyullyn', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'mining', 5)
+    .setXp(EventType.BLOCK_BREAK, 'mining', 4)
+
+    .nbtRequirement(ReqType.TOOL)
+    .additive(true)
+    .newCase('#tool_materials')
+    .equals('#manyullyn', 'mining', 25)
+    .done()
+})
+
+PmmoJS.perksConfig(event => {
+  event
+    .addPerk(EventType.BLOCK_BREAK, 'kubejs:manyullyn_focus', 'mining')
+    .withMinLevel(30)
+    .build()
+})
+
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (player && player.stages.has('mining_trial')) {
+    event.addXpAward('mining', 10)
+  }
+})
+```
+
+The static settings define normal progression. `globalsConfig` only makes the NBT rule readable. The custom perk keeps lifecycle state in `ctx.getSettings()` and emits a one-shot marker through `ctx.getResult()`. The trigger adds a quest-specific XP bonus for one runtime condition.
+
+## Related Pages
+
+- [PMMO Authoring Workflow](pmmo-workflow)
+- [PMMO Settings](serverevents/settings)
+- [Config Events](serverevents/config#pmmojsglobalsconfig)
+- [Perk Registration](startupevents/perks)
+- [Runtime Events](serverevents/normal)
+- [Internal Hooks](serverevents/internal)

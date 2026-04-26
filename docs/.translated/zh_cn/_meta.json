@@ -1,5 +1,6 @@
 {
   "overview.mdx": "模组概览",
+  "pmmo-workflow.mdx": "PMMO 编写流程",
   "tag-model.mdx": "标签模型",
   "startupevents": "启动事件",
   "serverevents": "服务端事件"

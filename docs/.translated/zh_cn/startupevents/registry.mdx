@@ -72,12 +72,15 @@ PmmoHelper.registerXpAwardData(
 PmmoHelper.registerTriggerListener('kubejs:example', EventType.BLOCK_BREAK,
   (forgeEvent, context) => {
     context.putInt('bonus_roll', 1)
+    context.putBoolean('is_cancelled', false)
     return context
   }
 )
 ```
 
-最后一个参数（`true`）告诉 PMMO 替换已有数据而不是与它合并。
+对于上面的直接数据注册方法，最后一个参数（`true`）告诉 PMMO 替换已有数据而不是与它合并。
+
+Raw trigger listener 返回的 tag 必须包含 `is_cancelled`；PMMO 会用这个键判断 listener 输出是否有效。普通运行时脚本优先用 `PmmoJS.trigger(...)`。
 
 完整直接注册方法列表：`registerRequirementData`、`registerXpAwardData`、`registerDamageXpAwardData`、`registerBonusData`、`registerPositiveEffects`、`registerNegativeEffects`、`registerSalvageData`、`registerVeinData`、`registerMobModifierData`、`registerTriggerListener`，以及对应的工具提示注册变体。
 

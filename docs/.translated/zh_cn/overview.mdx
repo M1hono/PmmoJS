@@ -4,6 +4,8 @@ PmmoJS 是 [Project MMO](https://www.curseforge.com/minecraft/mc-mods/project-mm
 
 它将 PMMO 的 API 封装成干净的 KubeJS 事件和辅助类，让你能用 JavaScript 配置 PMMO 的每一个部分 —— 技能、需求、经验奖励、Perk、触发器等等 —— 不写任何 Java 代码。
 
+如果你要从零设计整合包成长，先读 [PMMO 编写流程](./pmmo-workflow)。它会按顺序说明：定义技能、选择默认数据基线、注册对象数据、添加 NBT 规则、配置 Perk，最后用运行时 hook 处理例外。
+
 ## 三层控制能力
 
 PmmoJS 的功能按三个层级组织，对应 KubeJS 的脚本类型：

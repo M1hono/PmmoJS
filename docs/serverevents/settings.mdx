@@ -78,6 +78,93 @@ All settings builders share these methods:
 - `xp(eventType, map)` — set multiple XP awards at once
 - `override(boolean)` — when `true`, replace PMMO's default data instead of merging with it
 
+## Authoring flow
+
+Use `PmmoJS.settings(...)` for PMMO's object data. Object data is the normal place for stable pack rules:
+
+1. Choose the target object: item, block, entity, biome, or dimension.
+2. Decide whether you are replacing defaults with `override(true)` or layering onto them with `override(false)`.
+3. Add normal requirements and XP for rules based only on the registry ID.
+4. Add NBT logic only when the registry ID is not enough.
+5. Add type-specific extras such as salvage, effects, bonuses, or vein data.
+
+Runtime hooks like `PmmoJS.trigger(...)` should not be the first tool for requirements. If every diamond pickaxe needs level 20 mining, put that in `settings`. Use runtime hooks when the rule depends on live state such as stages, party state, temporary events, or custom context.
+
+## NBT logic with globals
+
+PMMO's NBT logic is for modular objects: one registry ID with different behavior stored in NBT. Examples include Tinkers' Construct, Tetra, Silent Gear, and other tools or armor that store material data in tags.
+
+There are three NBT builder entry points:
+
+| Method | Writes PMMO data for |
+|---|---|
+| `nbtRequirement(reqType)` | Skill requirements based on NBT |
+| `nbtXp(eventType)` | XP awards based on NBT |
+| `nbtBonus(modifierType)` | XP modifiers based on NBT |
+
+Each `.done()` call writes one PMMO `LogicEntry`. Multiple entries for the same object can combine with `BehaviorToPrevious`.
+
+`EventType`, `ReqType`, `ObjectType`, and `ModifierDataType` are PmmoJS globals. `BehaviorToPrevious` and `Operator` are PMMO NBT enums, so load them when you need the low-level enum directly. The convenience methods like `.equals(...)`, `.greaterThan(...)`, and `.exists(...)` do not require loading `Operator`.
+
+```js
+const BehaviorToPrevious = Java.loadClass('harmonised.pmmo.core.nbt.BehaviorToPrevious')
+
+PmmoJS.globalsConfig(event => {
+  event.addPath('head_material', 'tic_materials[0]')
+  event.addPath('all_materials', 'tic_materials[]')
+  event.addPath('damage', 'Damage')
+
+  event.addConstant('iron', 'tconstruct:iron')
+  event.addConstant('manyullyn', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'mining', 5)
+
+    .nbtRequirement(ReqType.TOOL)
+    .newCase('#head_material')
+    .equals('#iron', 'mining', 10)
+    .equals('#manyullyn', 'mining', 35)
+    .done()
+
+    .nbtRequirement(ReqType.TOOL)
+    .behavior(BehaviorToPrevious.SUB_FROM)
+    .newCase('#damage')
+    .greaterThan(800, 'mining', 10)
+    .done()
+})
+```
+
+In this example:
+
+- `setRequirement(...)` gives the item a base rule.
+- `#head_material` expands through `globalsConfig` before PMMO reads NBT.
+- `#iron` and `#manyullyn` expand through `globalsConfig` before PMMO compares values.
+- `BehaviorToPrevious.SUB_FROM` subtracts the second NBT entry from the result built before it.
+
+Use `.additive(true)` when one NBT path can return several values and each match should contribute:
+
+```js
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .nbtRequirement(ReqType.TOOL)
+    .additive(true)
+    .newCase('#all_materials')
+    .equals('#iron', 'mining', 5)
+    .equals('#manyullyn', 'mining', 20)
+    .done()
+})
+```
+
+Without `.additive(true)`, PMMO keeps the highest value for duplicate skills inside one logic entry. With it, matching cases add together.
+
+See [Config Events](config#pmmojsglobalsconfig) for how globals work and [PMMO Authoring Workflow](../pmmo-workflow) for the full data flow.
+
 ## Type-specific features
 
 Depending on the builder type, you also get access to:

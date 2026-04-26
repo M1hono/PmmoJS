@@ -1,0 +1,255 @@
+---
+title: PMMO Authoring Workflow
+hide_meta: true
+---
+
+# PMMO Authoring Workflow
+
+PmmoJS is easiest to use when you treat PMMO as a data pipeline, not as a list of isolated KubeJS events. Most pack work follows the same path:
+
+1. Decide what skills exist.
+2. Decide whether PMMO's default data stays or gets cleared.
+3. Register requirements, XP, bonuses, and NBT rules for objects.
+4. Add perks that turn skill levels into gameplay effects.
+5. Add runtime hooks only for behavior that cannot be expressed as data.
+
+This page connects the main documentation sections and explains when each one belongs in the workflow.
+
+## PMMO's data model
+
+PMMO starts with a few core concepts:
+
+| Concept | What it means in PMMO | PmmoJS surface |
+|---|---|---|
+| Skill | A named level track such as `mining`, `combat`, or a custom pack skill | `PmmoJS.skillsConfig(...)` |
+| Object data | Requirements, XP awards, bonuses, effects, salvage, and vein data attached to items, blocks, entities, biomes, and dimensions | `PmmoJS.settings(...)` |
+| Server config | Global rules such as max level, XP formula, party bonus, vein mining behavior, and death loss | `PmmoJS.serverConfig(...)` |
+| Auto values | PMMO's generated defaults for item and block data | `PmmoJS.autoValueConfig(...)` |
+| Anti-cheese | PMMO's AFK, diminishing-return, and normalization rules | `PmmoJS.antiCheeseConfig(...)` |
+| Perk entry | A configured perk that PMMO runs for a skill and event | `PmmoJS.perksConfig(...)` |
+| Custom perk type | A new perk behavior registered by your pack | `PmmoJS.registerPerk(...)` |
+| Trigger context | Runtime state created when PMMO processes an `EventType` | `PmmoJS.trigger(...)` |
+| Internal handler context | Runtime state from PMMO handlers that do not use the trigger registry | `PmmoJS.internal(...)` |
+| NBT logic | Conditional requirements, XP, or bonuses based on item/block/entity NBT | `setting.nbtRequirement(...)`, `setting.nbtXp(...)`, `setting.nbtBonus(...)` |
+
+The key split is **data first, runtime second**. If a rule can be expressed as PMMO data, use `settings` or a config event. Use runtime hooks for exceptions, temporary state, custom rewards, or handler behavior that PMMO does not expose as data.
+
+## Execution order
+
+PmmoJS follows KubeJS and PMMO load order:
+
+1. `startup_scripts/` define structures that must exist before gameplay: custom perk types, custom predicates, direct PMMO registrations, and raw Forge listeners.
+2. PMMO loads its built-in and datapack data.
+3. PmmoJS applies default-data resets from `config/pmmojs-common.toml`.
+4. `server_scripts/` apply `skillsConfig`, `settings`, `perksConfig`, `serverConfig`, `autoValueConfig`, `antiCheeseConfig`, and `globalsConfig`.
+5. During gameplay, `PmmoJS.trigger`, `PmmoJS.internal`, `PmmoJS.xp`, and the other runtime hooks react to PMMO events.
+
+Use [Startup Phase Rules](startupevents/phases) when you are unsure where a script belongs.
+
+## Choose the right surface
+
+| Goal | Use | Why |
+|---|---|---|
+| Add a new skill or remove a default skill | `PmmoJS.skillsConfig(...)` | Skills must exist before settings and perks can refer to them |
+| Replace vanilla PMMO progression | `config/pmmojs-common.toml` plus `PmmoJS.settings(...)` | Clear broad categories first, then rebuild only the pack rules you want |
+| Set level gates or XP for an object ID | `PmmoJS.settings(...)` | PMMO's object data is the native source for requirements and awards |
+| Make one item ID behave differently by NBT | `setting.nbtRequirement(...)`, `setting.nbtXp(...)`, `setting.nbtBonus(...)` | PMMO evaluates NBT logic at the moment it checks the object |
+| Reuse long NBT paths or long comparator values | `PmmoJS.globalsConfig(...)` | PMMO expands `#alias` in NBT paths and comparators |
+| Configure an existing PMMO perk | `PmmoJS.perksConfig(...)` | You are editing a perk entry, not defining new behavior |
+| Create a new perk behavior | `PmmoJS.registerPerk(...)` in `startup_scripts/` | PMMO needs the perk type registered before config entries reference it |
+| Add extra XP when a runtime condition is true | `PmmoJS.trigger(...)` | The condition depends on live game state, not static object data |
+| Skip PMMO's handler without cancelling the game action | `PmmoJS.internal(...).skipPmmo()` | Internal handlers control PMMO-specific behavior |
+| Deny the underlying game action | `PmmoJS.internal(...).deny()` | This cancels the wrapped Forge action and skips PMMO |
+| Inspect or adjust XP changes | `PmmoJS.xp(...)` | This fires when PMMO changes a player's XP |
+
+## Build a pack feature in passes
+
+### 1. Define the progression vocabulary
+
+Start with skills. A rule that references a missing skill will not create a useful player progression loop.
+
+```js
+PmmoJS.skillsConfig(event => {
+  event
+    .addSkill('engineering')
+    .withColor(0x5da7c8)
+    .withMaxLevel(100)
+    .build()
+
+  event
+    .addSkill('alchemy')
+    .withColor(0x8f54c8)
+    .withMaxLevel(100)
+    .build()
+})
+```
+
+See [Config Events](serverevents/config) for skill and server config details.
+
+### 2. Pick a baseline
+
+If you want PMMO's built-in defaults plus a few additions, leave `config/pmmojs-common.toml` alone. If you are designing full pack progression, clear the default categories you will rebuild.
+
+```toml
+[disableDefaultSettings]
+requirements = true
+xpAwards = true
+itemExtras = true
+```
+
+See [Reset Defaults](serverevents/reset-recipes) before wiping broad categories.
+
+### 3. Register normal object data
+
+Use `PmmoJS.settings(...)` for stable object ID rules.
+
+```js
+PmmoJS.settings(event => {
+  event
+    .item('minecraft:diamond_pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'mining', 20)
+    .setXp(EventType.BLOCK_BREAK, 'mining', 12)
+
+  event
+    .block('minecraft:deepslate_diamond_ore')
+    .override(true)
+    .setRequirement(ReqType.BREAK, 'mining', 30)
+    .setXp(EventType.BLOCK_BREAK, 'mining', 250)
+})
+```
+
+See [PMMO Settings](serverevents/settings) for items, blocks, entities, biomes, dimensions, NBT logic, salvage, and vein data.
+
+### 4. Add NBT rules only where object IDs are not enough
+
+Modular items often share one registry ID while storing material, grade, or part data in NBT. Use globals to name the repeated paths and comparator values, then reference them with `#alias` in NBT builders.
+
+```js
+PmmoJS.globalsConfig(event => {
+  event.addPath('tool_head', 'tic_materials[0]')
+  event.addPath('tool_parts', 'tic_materials[]')
+
+  event.addConstant('iron_head', 'tconstruct:iron')
+  event.addConstant('manyullyn_head', 'tconstruct:manyullyn')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('tconstruct:pickaxe')
+    .override(true)
+    .nbtRequirement(ReqType.TOOL)
+    .newCase('#tool_head')
+    .equals('#iron_head', 'mining', 10)
+    .equals('#manyullyn_head', 'mining', 35)
+    .done()
+})
+```
+
+PMMO expands `#tool_head` to `tic_materials[0]` before reading the item's NBT. It expands `#manyullyn_head` before comparing the NBT value. See the globals section in [Config Events](serverevents/config#pmmojsglobalsconfig).
+
+### 5. Add perks after the data exists
+
+Use `perksConfig` when PMMO already has the perk type:
+
+```js
+PmmoJS.perksConfig(event => {
+  event
+    .addPerk(EventType.SKILL_UP, 'pmmo:attribute', 'endurance')
+    .asAttributePerk()
+    .withAttribute(Java.loadClass('net.minecraft.world.entity.ai.attributes.Attributes').MAX_HEALTH)
+    .withPerLevel(1)
+    .withMaxBoost(10)
+    .build()
+})
+```
+
+Use `registerPerk` in `startup_scripts/` when you need behavior PMMO does not ship with. See [Perk Registration](startupevents/perks) and [Tag Model](tag-model).
+
+### 6. Add runtime hooks for exceptions
+
+Runtime hooks should usually adjust a finished PMMO decision, not replace your data model.
+
+```js
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (!player) return
+
+  if (player.stages.has('festival_mining_bonus')) {
+    event.addXpAward('mining', 25)
+  }
+})
+```
+
+Use [Runtime Events](serverevents/normal) for trigger, XP, enchant, furnace, salvage, and damage penalty hooks. Use [Internal Hooks](serverevents/internal) for dimension travel, explosions, login, mount, pistons, player death, potion brewing, and sleep.
+
+## Worked scenario: modular tool progression
+
+This scenario uses several surfaces together:
+
+1. `skillsConfig` creates `engineering`.
+2. `globalsConfig` names long modular-tool paths and material IDs.
+3. `settings` sets base requirements on the item ID.
+4. `nbtRequirement` raises requirements for high-tier materials.
+5. `trigger` adds a temporary XP bonus during a quest stage.
+
+```js
+PmmoJS.skillsConfig(event => {
+  event
+    .addSkill('engineering')
+    .withColor(0x5da7c8)
+    .withMaxLevel(100)
+    .build()
+})
+
+PmmoJS.globalsConfig(event => {
+  event.addPath('silent_parts', 'SGear_Data{}.Construction{}.Parts[].Item{}.tag{}.Materials[].ID')
+  event.addConstant('azure_silver', 'silentgear:azure_silver')
+  event.addConstant('crimson_iron', 'silentgear:crimson_iron')
+})
+
+PmmoJS.settings(event => {
+  event
+    .item('silentgear:pickaxe')
+    .override(true)
+    .setRequirement(ReqType.TOOL, 'engineering', 8)
+    .setXp(EventType.BLOCK_BREAK, 'engineering', 4)
+
+    .nbtRequirement(ReqType.TOOL)
+    .additive(true)
+    .newCase('#silent_parts')
+    .equals('#azure_silver', 'engineering', 12)
+    .equals('#crimson_iron', 'engineering', 18)
+    .done()
+})
+
+PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
+  const player = event.getPlayer()
+  if (player && player.stages.has('engineering_trial')) {
+    event.addXpAward('engineering', 10)
+  }
+})
+```
+
+The static data handles normal progression. The runtime trigger only adds the quest-specific bonus.
+
+## Common failure modes
+
+- Putting reloadable gameplay rules in `startup_scripts/`. Use `server_scripts/` unless you are registering a type or raw Forge listener.
+- Using `PmmoJS.trigger(...)` to replace simple requirements. Put stable gates in `PmmoJS.settings(...)`.
+- Forgetting `override(true)` when changing existing PMMO or vanilla data.
+- Using globals outside NBT logic. PMMO only expands `#alias` for NBT paths and NBT comparators.
+- Registering a custom perk in `server_scripts/`. Perk types belong in `startup_scripts/`; perk entries belong in `server_scripts/`.
+- Editing XP in `PmmoJS.xp(...)` when object data would be clearer. Use XP hooks for inspection, cancellation, or global rules that depend on the final XP event.
+
+## Verification loop
+
+During pack authoring:
+
+1. Install ProbeJS or ProbeJS Legacy.
+2. Enter a world and run `/probejs dump`.
+3. Use generated enum completions instead of guessing `EventType`, `ReqType`, or `PMMOInternalType` names.
+4. Reload server scripts after changes.
+5. Test one PMMO action at a time: requirement gate, XP award, NBT variant, perk activation, then runtime hook.
+
+See [ProbeJS Type Generation](probejs) for generated files and snippets.

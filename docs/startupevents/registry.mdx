@@ -72,12 +72,15 @@ PmmoHelper.registerXpAwardData(
 PmmoHelper.registerTriggerListener('kubejs:example', EventType.BLOCK_BREAK,
   (forgeEvent, context) => {
     context.putInt('bonus_roll', 1)
+    context.putBoolean('is_cancelled', false)
     return context
   }
 )
 ```
 
-The last parameter (`true`) tells PMMO to replace existing data rather than merging with it.
+For the direct data helpers above, the last parameter (`true`) tells PMMO to replace existing data rather than merging with it.
+
+Raw trigger listeners must return a tag containing `is_cancelled`; PMMO uses that key to decide whether the listener output is valid. Use `PmmoJS.trigger(...)` for ordinary runtime scripts.
 
 Full list of direct registration methods: `registerRequirementData`, `registerXpAwardData`, `registerDamageXpAwardData`, `registerBonusData`, `registerPositiveEffects`, `registerNegativeEffects`, `registerSalvageData`, `registerVeinData`, `registerMobModifierData`, `registerTriggerListener`, plus tooltip registration variants.
 
