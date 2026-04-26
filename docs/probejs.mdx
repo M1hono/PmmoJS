@@ -1,71 +1,71 @@
 ---
-title: ProbeJS Type Generation
+title: ProbeJS 类型生成
 hide_meta: true
 ---
 
-# ProbeJS Type Generation
+# ProbeJS 类型生成
 
-PmmoJS adds type completions and snippets to ProbeJS and ProbeJS Legacy. ProbeJS is optional; PmmoJS runs normally without it.
+PmmoJS 会为 ProbeJS 和 ProbeJS Legacy 添加类型补全与代码片段。ProbeJS 是可选依赖；不安装 ProbeJS 时，PmmoJS 仍然正常运行。
 
-A pack loads one ProbeJS variant:
+整合包只需要加载一个 ProbeJS 变体：
 
-| Mod ID | Use when |
+| Mod ID | 适用情况 |
 |---|---|
-| `probejs` | You use the current ProbeJS line |
-| `probejs_legacy` | You use ProbeJS Legacy |
+| `probejs` | 使用当前 ProbeJS |
+| `probejs_legacy` | 使用 ProbeJS Legacy |
 
-PmmoJS probe plugins do not belong in `kubejs.plugins.txt`. PmmoJS detects the installed ProbeJS variant and registers its integration automatically.
+不要把 PmmoJS 的 ProbeJS 插件写进 `kubejs.plugins.txt`。PmmoJS 会检测当前安装的 ProbeJS 变体，并自动注册对应集成。
 
-## Generate types
+## 生成类型
 
-Type generation runs from an open world:
+类型生成需要在已进入世界后执行：
 
 ```mcfunction
 /probejs dump
 ```
 
-After the dump finishes, VSCode may need a reload or TypeScript server restart before completions appear.
+dump 完成后，如果补全没有立即出现，可以重新加载 VSCode 或重启 TypeScript 服务。
 
-## Generated type groups
+## 生成的类型组
 
-The generated types cover PMMO values used by PmmoJS scripts:
+生成结果覆盖 PmmoJS 脚本常用的 PMMO 值：
 
-| Type group | Values |
+| 类型组 | 内容 |
 |---|---|
-| Event types | `BLOCK_BREAK`, `CRAFT`, `DEAL_DAMAGE`, `SKILL_UP`, and other PMMO `EventType` names |
-| Trigger IDs | All PMMO trigger IDs exposed by `PmmoHelper.getTriggerTypeIds()` |
-| Internal hook IDs | `dimensionTravel`, `login`, `potionBrew`, and other `PMMOInternalType` IDs |
-| Requirement types | `WEAPON`, `TOOL`, `BREAK`, `ENTITY_INTERACT`, and other `ReqType` names |
-| Object types | `ITEM`, `BLOCK`, `ENTITY`, `BIOME`, `DIMENSION`, and related PMMO object categories |
-| Modifier types | PMMO `ModifierDataType` values |
-| Perk sides | `SERVER`, `CLIENT`, `BOTH` |
+| Event 类型 | `BLOCK_BREAK`, `CRAFT`, `DEAL_DAMAGE`, `SKILL_UP` 等 PMMO `EventType` 名称 |
+| Trigger ID | `PmmoHelper.getTriggerTypeIds()` 暴露的全部 PMMO trigger ID |
+| Internal hook ID | `dimensionTravel`, `login`, `potionBrew` 等 `PMMOInternalType` ID |
+| Requirement 类型 | `WEAPON`, `TOOL`, `BREAK`, `ENTITY_INTERACT` 等 `ReqType` 名称 |
+| Object 类型 | `ITEM`, `BLOCK`, `ENTITY`, `BIOME`, `DIMENSION` 等 PMMO 对象分类 |
+| Modifier 类型 | PMMO `ModifierDataType` 值 |
+| Perk side | `SERVER`, `CLIENT`, `BOTH` |
 
-Regular ProbeJS exposes these as `Special.*` unions, such as `Special.EventType`, `Special.ReqType`, and `Special.PMMOInternalType`.
+ProbeJS 会把这些值生成为 `Special.*` 联合类型，例如 `Special.EventType`、`Special.ReqType`、`Special.PMMOInternalType`。
 
-ProbeJS Legacy writes equivalent global aliases, such as `PmmoEventType`, `PmmoReqType`, and `PmmoInternalType`.
+ProbeJS Legacy 会写出等价的全局别名，例如 `PmmoEventType`、`PmmoReqType`、`PmmoInternalType`。
 
-## Generated files
+## 生成文件
 
-The output location depends on the ProbeJS variant:
+输出位置取决于使用的 ProbeJS 变体：
 
-| Variant | Main output |
+| 变体 | 主要输出 |
 |---|---|
-| ProbeJS | `kubejs/probe/generated/globals.d.ts` and `.vscode/probe.code-snippets` |
-| ProbeJS Legacy | `.probe/server/global/special_types.d.ts` and `.probe/server/packages/com.pickaid.d.ts` |
+| ProbeJS | `kubejs/probe/generated/globals.d.ts` 和 `.vscode/probe.code-snippets` |
+| ProbeJS Legacy | `.probe/server/global/special_types.d.ts` 和 `.probe/server/packages/com.pickaid.d.ts` |
 
-ProbeJS may generate more package files than the ones listed here. Those extra files are normal.
+ProbeJS 可能生成更多包文件。这些额外文件属于正常输出。
 
-## Snippet groups
+## 代码片段组
 
-PmmoJS also registers snippets for common script patterns:
+PmmoJS 也会注册常用脚本模式的代码片段：
 
 - `pmmojs.event_type`, `pmmojs.trigger_type`, `pmmojs.internal_type`
 - `pmmojs.req_type`, `pmmojs.object_type`, `pmmojs.modifier_type`, `pmmojs.perk_side`
-- Trigger handler, internal hook, batch settings, perk lifecycle, and config event scaffolds
+- trigger 处理器、internal hook、批量 settings、perk 生命周期、config event 脚手架
 
-## Generation constraints
+## 生成约束
 
-- `/probejs dump` requires PmmoJS and one ProbeJS variant to be loaded.
-- Switching between ProbeJS and ProbeJS Legacy can leave stale generated files. Remove the old generated files and run `/probejs dump` again.
-- Updating PmmoJS or Project MMO requires a new dump for current enum values.
-- Manual registration of `PmmoJSProbePlugin` or `PmmoJSLegacyProbePlugin` can force optional ProbeJS classes to load when the matching mod is not installed.
+- `/probejs dump` 需要同时加载 PmmoJS 和一个 ProbeJS 变体。
+- 在 ProbeJS 与 ProbeJS Legacy 之间切换时，旧生成文件可能残留。删除旧生成文件后重新运行 `/probejs dump`。
+- 更新 PmmoJS 或 Project MMO 后，需要重新 dump 才能得到当前枚举值。
+- 手动注册 `PmmoJSProbePlugin` 或 `PmmoJSLegacyProbePlugin` 可能会在未安装对应 ProbeJS 变体时强制加载可选类。

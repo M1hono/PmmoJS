@@ -1,6 +1,6 @@
 {
   "overview.mdx": "Mod Overview",
-  "probejs.mdx": "ProbeJS Types",
+  "probejs.mdx": "ProbeJS 类型生成",
   "tag-model.mdx": "Tag Model",
   "startupevents": "Startup Events",
   "serverevents": "Server Events"

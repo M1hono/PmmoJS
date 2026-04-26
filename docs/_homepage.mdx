@@ -9,7 +9,7 @@ PmmoJS exposes PMMO skills, experience awards, requirements, perks, triggers, an
 | Script folder | PmmoJS usage |
 |---|---|
 | `startup_scripts/` | Perk registration, predicates, direct PMMO data registration, Forge event listeners |
-| `server_scripts/` | Runtime triggers, config editing, gameplay hooks, optional custom ProbeJS docs |
+| `server_scripts/` | 运行时 trigger、配置编辑、玩法 hook、可选的自定义 ProbeJS 文档 |
 | `client_scripts/` | Read-only skill display helpers, client-side UI logic |
 
 Startup scripts define structures that must exist before gameplay begins. Server scripts handle reloadable PMMO settings, config mutation, and gameplay events. Client scripts expose read-only skill helpers for UI work.
@@ -22,4 +22,4 @@ Startup scripts define structures that must exist before gameplay begins. Server
 
 ## Editor support
 
-ProbeJS and ProbeJS Legacy are optional. When one ProbeJS variant is installed, PmmoJS registers type completions and snippets automatically during `/probejs dump`.
+ProbeJS 和 ProbeJS Legacy 都是可选依赖。安装其中一个 ProbeJS 变体后，PmmoJS 会在 `/probejs dump` 时自动注册类型补全和代码片段。

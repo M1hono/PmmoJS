@@ -14,7 +14,7 @@ For Forge 1.20.1 with KubeJS:
 | Script folder | Purpose |
 |---|---|
 | `startup_scripts/` | Registration and startup-only Forge hooks |
-| `server_scripts/` | PMMO runtime logic and optional custom ProbeJS docs |
+| `server_scripts/` | PMMO 运行逻辑和可选的自定义 ProbeJS 文档 |
 | `client_scripts/` | Read-only skill display helpers and client-side UI |
 
 ## Practical guide
@@ -61,13 +61,13 @@ PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
   }
 })
 
-// Custom ProbeJS doc generation
+// 自定义 ProbeJS 文档生成
 ProbeJSEvents.generateDoc(event => {
   event.addSnippet('pmmojs.trigger.type', PmmoHelper.getTriggerTypeIds(), 'PmmoJS trigger ids')
 })
 ```
 
-PmmoJS built-in ProbeJS types and snippets are registered automatically. You only need `ProbeJSEvents.generateDoc(...)` for pack-specific additions.
+PmmoJS 内置的 ProbeJS 类型和代码片段会自动注册。`ProbeJSEvents.generateDoc(...)` 只用于整合包自己的额外文档或片段。
 
 ### `client_scripts/`
 
@@ -76,7 +76,7 @@ Limited to read-only operations. `SkillHelper` and `ClientSkillHelper` are avail
 ## Common mistakes
 
 - **Putting `ForgeEvents.onEvent(...)` in `server_scripts/`** — on KubeJS 1.20.1, this is a startup API. It won't work in server scripts.
-- **Putting `ProbeJSEvents.generateDoc(...)` in `startup_scripts/`** — this is a server-side API for custom docs. It won't work in startup scripts.
+- **Putting `ProbeJSEvents.generateDoc(...)` in `startup_scripts/`** — 这是 server script API，用于自定义 ProbeJS 文档。它不能在 startup scripts 中运行。
 - **Putting `PmmoJS.registerPerk(...)` in `server_scripts/`** — this needs to run at registration time, not during gameplay. Move it to startup.
 
 ## Reload behavior
@@ -92,4 +92,4 @@ Ask yourself what the code does:
 - **Defines data or structures at load time?** → `startup_scripts/`
 - **Reacts to gameplay or edits config?** → `server_scripts/`
 - **Only reads skill data for UI display?** → `client_scripts/`
-- **Adds custom ProbeJS docs?** → `server_scripts/`
+- **添加自定义 ProbeJS 文档？** → `server_scripts/`

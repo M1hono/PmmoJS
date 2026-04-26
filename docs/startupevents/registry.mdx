@@ -21,7 +21,7 @@ Startup events register structures that PMMO needs before gameplay begins. These
 - `PmmoJS.trigger(...)`, `PmmoJS.internal(...)` — runtime hooks
 - All config events — `PmmoJS.skillsConfig(...)`, `PmmoJS.perksConfig(...)`, etc.
 - `PmmoJS.settings(...)` — item/block/entity data
-- `ProbeJSEvents.generateDoc(...)` — custom ProbeJS documentation generation
+- `ProbeJSEvents.generateDoc(...)` — 自定义 ProbeJS 文档生成
 
 ## `PmmoJS.registerPredicate`
 
@@ -94,6 +94,6 @@ ForgeEvents.onEvent(
 )
 ```
 
-Note: `ProbeJSEvents.generateDoc(...)` is a server-script API, not startup. These two event systems have different lifecycles even though they look similar.
+`ProbeJSEvents.generateDoc(...)` 是 server script API，不是 startup API。两套事件系统看起来相似，但生命周期不同。
 
-PmmoJS registers its own ProbeJS types automatically. Use `ProbeJSEvents.generateDoc(...)` only when your pack adds extra snippets or custom docs.
+PmmoJS 会自动注册自己的 ProbeJS 类型。`ProbeJSEvents.generateDoc(...)` 只用于整合包自己的额外代码片段或自定义文档。

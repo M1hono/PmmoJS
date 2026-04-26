@@ -89,8 +89,8 @@ PmmoJS.internal(PMMOInternalType.EXPLOSION, event => {
 - `putContextBoolean(key, value)`, `putContextString(key, value)`, etc. — write context values
 - `getXpAwards()`, `setXpAwards(map)`, `setXpAward(skill, amount)`, `addXpAward(skill, amount)` — XP management
 
-## ProbeJS type completions
+## ProbeJS 类型补全
 
-PmmoJS ships with ProbeJS support for both ProbeJS and ProbeJS Legacy. Type completions for enum values, event objects, and utility classes are provided automatically when ProbeJS generates its type definitions.
+PmmoJS 支持 ProbeJS 和 ProbeJS Legacy。ProbeJS 生成类型定义时，会同时生成枚举值、事件对象和工具类的类型补全。
 
-You do not need to write custom ProbeJS event listeners for PmmoJS types — they are registered by the plugin during mod initialization.
+PmmoJS 类型不需要额外编写 ProbeJS event listener；插件会在 mod 初始化时完成注册。
