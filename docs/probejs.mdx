@@ -1,0 +1,71 @@
+---
+title: ProbeJS Type Generation
+hide_meta: true
+---
+
+# ProbeJS Type Generation
+
+PmmoJS adds type completions and snippets to ProbeJS and ProbeJS Legacy. ProbeJS is optional; PmmoJS runs normally without it.
+
+A pack loads one ProbeJS variant:
+
+| Mod ID | Use when |
+|---|---|
+| `probejs` | You use the current ProbeJS line |
+| `probejs_legacy` | You use ProbeJS Legacy |
+
+PmmoJS probe plugins do not belong in `kubejs.plugins.txt`. PmmoJS detects the installed ProbeJS variant and registers its integration automatically.
+
+## Generate types
+
+Type generation runs from an open world:
+
+```mcfunction
+/probejs dump
+```
+
+After the dump finishes, VSCode may need a reload or TypeScript server restart before completions appear.
+
+## Generated type groups
+
+The generated types cover PMMO values used by PmmoJS scripts:
+
+| Type group | Values |
+|---|---|
+| Event types | `BLOCK_BREAK`, `CRAFT`, `DEAL_DAMAGE`, `SKILL_UP`, and other PMMO `EventType` names |
+| Trigger IDs | All PMMO trigger IDs exposed by `PmmoHelper.getTriggerTypeIds()` |
+| Internal hook IDs | `dimensionTravel`, `login`, `potionBrew`, and other `PMMOInternalType` IDs |
+| Requirement types | `WEAPON`, `TOOL`, `BREAK`, `ENTITY_INTERACT`, and other `ReqType` names |
+| Object types | `ITEM`, `BLOCK`, `ENTITY`, `BIOME`, `DIMENSION`, and related PMMO object categories |
+| Modifier types | PMMO `ModifierDataType` values |
+| Perk sides | `SERVER`, `CLIENT`, `BOTH` |
+
+Regular ProbeJS exposes these as `Special.*` unions, such as `Special.EventType`, `Special.ReqType`, and `Special.PMMOInternalType`.
+
+ProbeJS Legacy writes equivalent global aliases, such as `PmmoEventType`, `PmmoReqType`, and `PmmoInternalType`.
+
+## Generated files
+
+The output location depends on the ProbeJS variant:
+
+| Variant | Main output |
+|---|---|
+| ProbeJS | `kubejs/probe/generated/globals.d.ts` and `.vscode/probe.code-snippets` |
+| ProbeJS Legacy | `.probe/server/global/special_types.d.ts` and `.probe/server/packages/com.pickaid.d.ts` |
+
+ProbeJS may generate more package files than the ones listed here. Those extra files are normal.
+
+## Snippet groups
+
+PmmoJS also registers snippets for common script patterns:
+
+- `pmmojs.event_type`, `pmmojs.trigger_type`, `pmmojs.internal_type`
+- `pmmojs.req_type`, `pmmojs.object_type`, `pmmojs.modifier_type`, `pmmojs.perk_side`
+- Trigger handler, internal hook, batch settings, perk lifecycle, and config event scaffolds
+
+## Generation constraints
+
+- `/probejs dump` requires PmmoJS and one ProbeJS variant to be loaded.
+- Switching between ProbeJS and ProbeJS Legacy can leave stale generated files. Remove the old generated files and run `/probejs dump` again.
+- Updating PmmoJS or Project MMO requires a new dump for current enum values.
+- Manual registration of `PmmoJSProbePlugin` or `PmmoJSLegacyProbePlugin` can force optional ProbeJS classes to load when the matching mod is not installed.

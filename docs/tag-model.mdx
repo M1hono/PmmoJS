@@ -7,7 +7,7 @@ hide_meta: true
 
 PmmoJS uses NBT tags in several different places. If you look at the perk system alone, you will see tags in at least four different roles. This page explains what each tag does and when to use which one.
 
-## The short version
+## Tag categories
 
 You will encounter two main categories of tags in PmmoJS:
 
@@ -126,10 +126,3 @@ Key differences from triggers:
 - Use `ctx.getResult()` only in `start()` for output that should flow into the current PMMO execution pass.
 - For trigger and internal hook context, use the `getContext*` / `putContext*` helper methods on the event object.
 - Only use raw `CompoundTag` when the API intentionally exposes it (e.g., `PmmoJS.xp(...)` or `PmmoHelper.registerTriggerListener(...)`).
-
-## Related
-
-- [Startup Perk Registration](./startupevents/perks)
-- [Custom Perk Tags](./startupevents/custom-perk-tags)
-- [Runtime Events](./serverevents/normal)
-- [Internal Hooks](./serverevents/internal)

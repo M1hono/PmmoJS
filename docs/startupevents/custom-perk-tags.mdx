@@ -5,9 +5,7 @@ hide_meta: true
 
 # Custom Perk Tags
 
-When you write a custom perk, you will work with two tags: `ctx.getSettings()` and `ctx.getResult()`. This page explains what each one is for and when to use which.
-
-For a full picture of the tag system, including trigger context tags and internal hook context tags, see [Tag Model](../tag-model).
+Custom perks work with two tags: `ctx.getSettings()` and `ctx.getResult()`. Each tag has a different lifetime and merge path.
 
 ## The two tags in `start()`
 
@@ -158,9 +156,3 @@ Every builder method writes a specific key into the startup default tag:
 | `withNumberList(k, arr)` | custom key (double list) |
 | `withCompound(k, v)` | custom key (compound) |
 | `defaults(tag => {})` | any combination through `PerkTagJS` |
-
-## Related
-
-- [Startup Perk Registration](./perks)
-- [Tag Model](../tag-model)
-- [Config Events](../serverevents/config)

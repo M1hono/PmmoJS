@@ -1,5 +1,6 @@
 {
   "overview.mdx": "Mod Overview",
+  "probejs.mdx": "ProbeJS Types",
   "tag-model.mdx": "Tag Model",
   "startupevents": "Startup Events",
   "serverevents": "Server Events"

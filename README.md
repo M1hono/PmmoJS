@@ -30,6 +30,7 @@ For local regression testing this workspace also includes EMI `1.1.22+1.20.1+for
 The authored wiki pages live in [`docs`](./docs):
 
 - [`docs/overview.mdx`](./docs/overview.mdx)
+- [`docs/probejs.mdx`](./docs/probejs.mdx)
 - [`docs/tag-model.mdx`](./docs/tag-model.mdx)
 - [`docs/startupevents/registry.mdx`](./docs/startupevents/registry.mdx)
 - [`docs/serverevents/internal.mdx`](./docs/serverevents/internal.mdx)

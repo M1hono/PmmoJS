@@ -163,7 +163,7 @@ PmmoJS.registerPerk(event => {
 })
 ```
 
-Key points to notice:
+The example uses several independent settings:
 
 - `withInt('heal_interval', 20)` and `withDouble('heal_amount', 1.0)` set configurable knobs. Players can override these in `perks.toml`.
 - `defaults(tag => {})` sets private fields only your perk uses. PMMO ignores unknown keys.
@@ -173,10 +173,3 @@ Key points to notice:
 - `tick(ctx)` uses `ctx.getElapsedTicks()` with a modulo check to run healing at a configurable interval.
 - `stop(ctx)` cleans up the `active` flag.
 - `status(ctx)` only builds UI lines — it does not create extra state.
-
-## Related
-
-- [Startup Registries](./registry)
-- [Phase Rules](./phases)
-- [Custom Perk Tags](./custom-perk-tags)
-- [Tag Model](../tag-model)

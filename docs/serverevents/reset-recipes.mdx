@@ -116,12 +116,6 @@ These only reset requirement data for their object type. They do not touch XP aw
 
 ## What the common config does not cover
 
-Biome and dimension settings do not have a blanket disable switch. This is intentional — location data typically needs explicit control from the pack author.
+Biome and dimension settings do not have a blanket disable switch. Location data requires explicit control from the pack author.
 
 Use targeted calls for location overrides: `event.biome(id, ...)`, `event.biomes(ids, ...)`, `event.dimension(id, ...)`, `event.dimensions(ids, ...)`.
-
-## Related
-
-- [PMMO Settings](./settings)
-- [Config Events](./config)
-- [Runtime Events](./normal)

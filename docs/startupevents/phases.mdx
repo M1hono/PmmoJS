@@ -5,7 +5,7 @@ hide_meta: true
 
 # Startup Phase Rules
 
-This page answers one question: **which script folder should hold each kind of PmmoJS code?**
+PmmoJS follows KubeJS script lifecycles. Each API belongs to the folder that matches when the code runs.
 
 ## The rule
 
@@ -14,7 +14,7 @@ For Forge 1.20.1 with KubeJS:
 | Script folder | Purpose |
 |---|---|
 | `startup_scripts/` | Registration and startup-only Forge hooks |
-| `server_scripts/` | PMMO runtime logic and ProbeJS doc generation |
+| `server_scripts/` | PMMO runtime logic and optional custom ProbeJS docs |
 | `client_scripts/` | Read-only skill display helpers and client-side UI |
 
 ## Practical guide
@@ -44,7 +44,7 @@ ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLo
 
 ### `server_scripts/`
 
-Use for gameplay reactions, config editing, and documentation generation:
+Use for gameplay reactions, config editing, and optional custom documentation generation:
 
 ```js
 // Runtime triggers
@@ -61,11 +61,13 @@ PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
   }
 })
 
-// ProbeJS doc generation
+// Custom ProbeJS doc generation
 ProbeJSEvents.generateDoc(event => {
   event.addSnippet('pmmojs.trigger.type', PmmoHelper.getTriggerTypeIds(), 'PmmoJS trigger ids')
 })
 ```
+
+PmmoJS built-in ProbeJS types and snippets are registered automatically. You only need `ProbeJSEvents.generateDoc(...)` for pack-specific additions.
 
 ### `client_scripts/`
 
@@ -74,7 +76,7 @@ Limited to read-only operations. `SkillHelper` and `ClientSkillHelper` are avail
 ## Common mistakes
 
 - **Putting `ForgeEvents.onEvent(...)` in `server_scripts/`** — on KubeJS 1.20.1, this is a startup API. It won't work in server scripts.
-- **Putting `ProbeJSEvents.generateDoc(...)` in `startup_scripts/`** — this is a server-side API. It won't work in startup scripts.
+- **Putting `ProbeJSEvents.generateDoc(...)` in `startup_scripts/`** — this is a server-side API for custom docs. It won't work in startup scripts.
 - **Putting `PmmoJS.registerPerk(...)` in `server_scripts/`** — this needs to run at registration time, not during gameplay. Move it to startup.
 
 ## Reload behavior
@@ -90,4 +92,4 @@ Ask yourself what the code does:
 - **Defines data or structures at load time?** → `startup_scripts/`
 - **Reacts to gameplay or edits config?** → `server_scripts/`
 - **Only reads skill data for UI display?** → `client_scripts/`
-- **Generates ProbeJS type docs?** → `server_scripts/`
+- **Adds custom ProbeJS docs?** → `server_scripts/`

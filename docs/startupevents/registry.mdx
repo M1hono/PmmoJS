@@ -21,7 +21,7 @@ Startup events register structures that PMMO needs before gameplay begins. These
 - `PmmoJS.trigger(...)`, `PmmoJS.internal(...)` — runtime hooks
 - All config events — `PmmoJS.skillsConfig(...)`, `PmmoJS.perksConfig(...)`, etc.
 - `PmmoJS.settings(...)` — item/block/entity data
-- `ProbeJSEvents.generateDoc(...)` — ProbeJS documentation generation
+- `ProbeJSEvents.generateDoc(...)` — custom ProbeJS documentation generation
 
 ## `PmmoJS.registerPredicate`
 
@@ -47,7 +47,7 @@ PmmoJS.registerPredicate(event => {
 
 Defines new PMMO perk types. This is the heavyweight API for creating custom perks with lifecycle callbacks.
 
-See [Perk Registration](./perks) for the full guide.
+Custom perk registration uses a dedicated builder with lifecycle callbacks.
 
 ## Direct PMMO registration
 
@@ -96,7 +96,4 @@ ForgeEvents.onEvent(
 
 Note: `ProbeJSEvents.generateDoc(...)` is a server-script API, not startup. These two event systems have different lifecycles even though they look similar.
 
-## Related
-
-- [Phase Rules](./phases)
-- [Perk Registration](./perks)
+PmmoJS registers its own ProbeJS types automatically. Use `ProbeJSEvents.generateDoc(...)` only when your pack adds extra snippets or custom docs.

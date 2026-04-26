@@ -1,16 +1,18 @@
 # PmmoJS Overview
 
-PmmoJS is a KubeJS addon for [Project MMO](https://www.curseforge.com/minecraft/mc-mods/project-mmo) on Forge 1.20.1.
+PmmoJS is a KubeJS addon for Project MMO on Forge 1.20.1.
 
-It wraps PMMO's API into clean KubeJS events and helpers, so you can configure every part of PMMO from JavaScript — skills, requirements, XP awards, perks, triggers, and more — without writing a single line of Java.
+It wraps PMMO's API as KubeJS events and helpers. Scripts can define skills, requirements, XP awards, perks, triggers, and handler behavior from JavaScript.
 
-## The three layers of control
+ProbeJS integration contributes type completions and snippets for PmmoJS events, helpers, and PMMO enum values.
+
+## Control layers
 
 PmmoJS organizes its features into three layers, matching the KubeJS script types:
 
 ### Startup layer (`startup_scripts/`)
 
-Registration that happens before the game world loads:
+Startup scripts register data before the game world loads:
 
 - **Custom perks** — define new perk types with `PmmoJS.registerPerk(...)`. Each perk gets lifecycle callbacks for conditions checking, startup, ticking, shutdown, and status display.
 - **Custom predicates** — register condition checks that PMMO evaluates using `PmmoJS.registerPredicate(...)`.
@@ -18,7 +20,7 @@ Registration that happens before the game world loads:
 
 ### Config layer (`server_scripts/`)
 
-Editing PMMO's configuration files through KubeJS events:
+Server scripts edit PMMO configuration through KubeJS events:
 
 | Event | What it controls |
 |---|---|
@@ -32,7 +34,7 @@ Editing PMMO's configuration files through KubeJS events:
 
 ### Runtime layer (`server_scripts/`)
 
-Hooks that fire during actual gameplay:
+Runtime hooks fire during gameplay:
 
 | Event | When it fires |
 |---|---|
@@ -47,7 +49,7 @@ Hooks that fire during actual gameplay:
 
 ## Script bindings
 
-PmmoJS registers these bindings for your KubeJS scripts. They are available depending on which script type you are in:
+PmmoJS registers bindings by script type:
 
 **Startup scripts:** `PmmoHelper`, `TagBuilder`, `NbtPathBuilder`
 
@@ -57,7 +59,7 @@ PmmoJS registers these bindings for your KubeJS scripts. They are available depe
 
 ### PmmoHelper
 
-`PmmoHelper` is the main utility class. It wraps PMMO's internal API into a clean set of static methods:
+`PmmoHelper` exposes PMMO API access through static methods:
 
 - **Skill state:** `getSkillLevel`, `setSkillLevel`, `addSkillXp`, `getAllSkillLevels`
 - **Data lookups:** `getItemXpAwards`, `getBlockRequirements`, `getConsolidatedModifiers`
@@ -68,7 +70,7 @@ PmmoJS registers these bindings for your KubeJS scripts. They are available depe
 
 ### Type enums
 
-PmmoJS also exposes PMMO's type enums so you have autocomplete for every value:
+PmmoJS exposes PMMO type enums for script constants:
 
 - `EventType` — PMMO event type names (e.g., `BLOCK_BREAK`, `CRAFT`, `DEATH`)
 - `PMMOInternalType` — internal hook type IDs (e.g., `DIMENSION_TRAVEL`, `LOGIN`)
@@ -84,13 +86,14 @@ PmmoJS also exposes PMMO's type enums so you have autocomplete for every value:
 | Minecraft | 1.20.1 |
 | Project MMO | 1.7.40 |
 | KubeJS | 2001.6.5-build.16+ |
-| ProbeJS (optional) | v6 or v7 (Legacy) |
+| ProbeJS (optional) | ProbeJS or ProbeJS Legacy |
 
-## When to use startup vs server scripts
+PmmoJS supports ProbeJS and ProbeJS Legacy as separate optional integrations. A pack should load one ProbeJS variant, then run `/probejs dump` to generate editor types.
 
-This is a common source of confusion. The rule is simple:
+## Startup and server scripts
 
-- **Startup scripts** run before the world loads. Use them for definitions and registrations that must exist at load time.
-- **Server scripts** run after the world is loaded. Use them for anything that reacts to gameplay or modifies config during a reload cycle.
+Startup scripts run before the world loads. They hold definitions and registrations that must exist at load time.
 
-Putting runtime logic in a startup script will fail. Putting registration logic in a server script may work, but it is not the intended lifecycle.
+Server scripts run after the world loads and on reload. They hold gameplay reactions and config changes.
+
+Runtime logic does not belong in startup scripts. Registration logic belongs in startup scripts unless a specific PmmoJS server event is documented for reload-time data mutation.
