@@ -4,7 +4,7 @@ template_version = "1.20.1-template-1.0.0"
 [mod]
 mod_id = "pmmojs"
 mod_name = "pmmojs"
-version = "0.5.1"
+version = "0.5.2"
 version_suffix = ""
 group = "com.mihono.pickaid"
 authors = ["PickAID Team"]
@@ -56,6 +56,8 @@ formal_version = "true"
 kubejs_version = "2001.6.5-build.16"
 mc_user = "Togawa_Sakiko_,b6a0483d-eaf2-4be6-8395-5eecdaa310a6"
 mixin_extras_version = "0.2.0-beta.8"
+probejs_version = "5227399"
+probejs_legacy_version = "6773935"
 rhino_version = "2001.2.3-build.10"
 
 [publish]

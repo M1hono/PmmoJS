@@ -2,6 +2,7 @@ package com.pickaid.pmmojs.kubejs.probe;
 
 import com.pickaid.pmmojs.kubejs.events.server.api.PMMOInternalType;
 import com.pickaid.pmmojs.utils.PmmoHelper;
+import com.probejs.ProbeJS;
 import com.probejs.ProbeJSPlugin;
 import com.probejs.features.plugin.DocGenerationEventJS;
 import com.probejs.features.plugin.ProbeJSEvents;
@@ -41,21 +42,21 @@ public class PmmoJSProbePlugin extends ProbeJSPlugin {
 
     private void registerSpecialTypes(DocGenerationEventJS event) {
         // EventType: string union of all event type names (e.g., "BLOCK_BREAK", "CRAFT")
-        event.specialType("EventType", new ArrayList<>(PmmoHelper.getEventTypeIds()));
+        event.specialType("EventType", jsonChoices(PmmoHelper.getEventTypeIds()));
         // TriggerType: string union of all trigger type IDs (e.g., "block_break", "craft")
-        event.specialType("TriggerType", new ArrayList<>(PmmoHelper.getTriggerTypeIds()));
+        event.specialType("TriggerType", jsonChoices(PmmoHelper.getTriggerTypeIds()));
         // PMMOInternalType: string union (e.g., "dimensionTravel", "login")
-        event.specialType("PMMOInternalType", new ArrayList<>(PmmoHelper.getInternalTypeIds()));
+        event.specialType("PMMOInternalType", jsonChoices(PmmoHelper.getInternalTypeIds()));
         // ReqType: string union of requirement types (e.g., "WEAPON", "KILL")
-        event.specialType("ReqType", new ArrayList<>(PmmoHelper.getReqTypeIds()));
+        event.specialType("ReqType", jsonChoices(PmmoHelper.getReqTypeIds()));
         // ObjectType: string union (e.g., "ITEM", "BLOCK", "ENTITY")
-        event.specialType("ObjectType", new ArrayList<>(PmmoHelper.getObjectTypeIds()));
+        event.specialType("ObjectType", jsonChoices(PmmoHelper.getObjectTypeIds()));
         // ModifierDataType: string union (e.g., "BIOME", "HELD", "WORN")
-        event.specialType("ModifierDataType", new ArrayList<>(
+        event.specialType("ModifierDataType", jsonChoices(
                 Arrays.stream(ModifierDataType.values()).map(ModifierDataType::name).toList()
         ));
         // PMMOPerkSide: "SERVER" | "CLIENT" | "BOTH"
-        event.specialType("PMMOPerkSide", List.of("SERVER", "CLIENT", "BOTH"));
+        event.specialType("PMMOPerkSide", jsonChoices(List.of("SERVER", "CLIENT", "BOTH")));
     }
 
     private void registerSnippets(DocGenerationEventJS event) {
@@ -174,7 +175,7 @@ public class PmmoJSProbePlugin extends ProbeJSPlugin {
                         "    .status(ctx => {",
                         "      ctx.addLine(`Skill: \\${ctx.getSettings().getSkill()}`)",
                         "      ctx.addLine(`Level: \\${ctx.getSettings().getResolvedLevel()}`)",
-                        "      ctx.addLine(`Cooldown: \\${ctx.getSettings().getCooldown()}t`",
+                        "      ctx.addLine(`Cooldown: \\${ctx.getSettings().getCooldown()}t`)",
                         "      ctx.addLine(`Chance: \\${ctx.getSettings().getChance() * 100}%`)",
                         "    })",
                         "    .register()",
@@ -222,5 +223,14 @@ public class PmmoJSProbePlugin extends ProbeJSPlugin {
                         "  })",
                         "})"
                 ), "PmmoJS config event patterns (server, skills, auto-value, anti-cheese)");
+    }
+
+    private static List<Object> jsonChoices(List<String> ids) {
+        return ids.stream()
+                .sorted()
+                .distinct()
+                .map(ProbeJS.GSON::toJson)
+                .map(Object.class::cast)
+                .toList();
     }
 }

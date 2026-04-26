@@ -154,6 +154,12 @@ repositories {
 }
 
 dependencies {
+    def probejsRuntime = (findProperty("probejsRuntime") ?: "modern").toString().toLowerCase()
+    def probejsRuntimeOptions = ["modern", "probejs", "regular", "legacy", "probejs_legacy", "none"]
+    if (!probejsRuntimeOptions.contains(probejsRuntime)) {
+        throw new GradleException("Unsupported probejsRuntime '${probejsRuntime}'. Use modern, legacy, or none.")
+    }
+
     minecraft "com.mojang:minecraft:${config.mc_version}"
     mappings loom.layered() {
         officialMojangMappings()
@@ -202,10 +208,14 @@ dependencies {
 
     // Test-only recipe viewer runtime for reproducing EMI sync/indexing regressions locally.
     modRuntimeOnly("curse.maven:emi-580555:6420945")
-    modCompileOnly("curse.maven:probejs-585406:5227399")
-    modRuntimeOnly("curse.maven:probejs-585406:5227399")
-    modCompileOnly("curse.maven:probejs-legacy-956446:7615033")
-    modRuntimeOnly("curse.maven:probejs-legacy-956446:7615033")
+    modCompileOnly("curse.maven:probejs-585406:${config.probejs_version}")
+    modCompileOnly("curse.maven:probejs-legacy-956446:${config.probejs_legacy_version}")
+    if (["modern", "probejs", "regular"].contains(probejsRuntime)) {
+        modRuntimeOnly("curse.maven:probejs-585406:${config.probejs_version}")
+    }
+    if (["legacy", "probejs_legacy"].contains(probejsRuntime)) {
+        modRuntimeOnly("curse.maven:probejs-legacy-956446:${config.probejs_legacy_version}")
+    }
 //    modCompileOnly("curse.maven:configured-457570:5180900")
 //    modRuntimeOnly("curse.maven:configured-457570:5180900")
 

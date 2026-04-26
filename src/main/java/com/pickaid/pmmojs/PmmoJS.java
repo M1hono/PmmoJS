@@ -6,7 +6,10 @@ import com.pickaid.pmmojs.kubejs.events.server.confg.SkillsEventJS;
 import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
 import com.pickaid.pmmojs.kubejs.events.startup.PredicateRegistryEventJS;
 import com.pickaid.pmmojs.kubejs.probe.PmmoJSLegacyProbeCompat;
+import com.pickaid.pmmojs.kubejs.probe.PmmoJSProbeCompat;
 import dev.latvian.mods.rhino.util.HideFromJS;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.OnDatapackSyncEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -34,6 +37,9 @@ public class PmmoJS {
         IEventBus modEventBus = ctx.getModEventBus();
         modEventBus.addListener(this::setUp);
 
+        if (ModList.get().isLoaded("probejs")) {
+            MinecraftForge.EVENT_BUS.addListener(PmmoJS::installProbeCompatAfterReload);
+        }
         if (ModList.get().isLoaded("probejs_legacy")) {
             PmmoJSLegacyProbeCompat.install();
         }
@@ -46,5 +52,11 @@ public class PmmoJS {
             PMMOKubeJSEvents.registerPerk();
             PMMOKubeJSEvents.registerTriggerBridge();
         });
+    }
+
+    private static void installProbeCompatAfterReload(OnDatapackSyncEvent event) {
+        if (event.getPlayer() == null) {
+            PmmoJSProbeCompat.reinstallAfterServerReload();
+        }
     }
 }
