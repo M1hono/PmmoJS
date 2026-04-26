@@ -5,8 +5,10 @@ import com.pickaid.pmmojs.kubejs.PMMOKubeJSEvents;
 import com.pickaid.pmmojs.kubejs.events.server.confg.SkillsEventJS;
 import com.pickaid.pmmojs.kubejs.events.startup.PerksRegistryEventJS;
 import com.pickaid.pmmojs.kubejs.events.startup.PredicateRegistryEventJS;
+import com.pickaid.pmmojs.kubejs.probe.PmmoJSLegacyProbeCompat;
 import dev.latvian.mods.rhino.util.HideFromJS;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -31,6 +33,10 @@ public class PmmoJS {
         FMLJavaModLoadingContext ctx = FMLJavaModLoadingContext.get();
         IEventBus modEventBus = ctx.getModEventBus();
         modEventBus.addListener(this::setUp);
+
+        if (ModList.get().isLoaded("probejs_legacy")) {
+            PmmoJSLegacyProbeCompat.install();
+        }
     }
 
     public void setUp(FMLCommonSetupEvent event) {

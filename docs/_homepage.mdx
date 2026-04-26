@@ -1,12 +1,39 @@
 # PmmoJS Documentation
 
-`PmmoJS` connects Project MMO and KubeJS on Forge `1.20.1`.
+PmmoJS connects Project MMO to KubeJS on Forge 1.20.1.
 
-Use these sections as your starting map:
+With PmmoJS, you can control PMMO's gameplay mechanics — skills, experience, requirements, perks, and triggers — directly from KubeJS scripts. No Java required.
 
-- [Overview](./overview) for the feature surface and script bindings
-- [Startup Events](./startupevents/registry) for predicates, perk registration, and direct PMMO registration
-- [Server Events](./serverevents/settings) for PMMO settings, config mutation, runtime hooks, and internal bridges
-- [Tag Model](./tag-model) for perk tags, runtime context tags, and config tag lifecycles
+## Where to start
 
-If you want PMMO to start from a cleaner baseline, see [Reset Defaults](./serverevents/reset-recipes) and the Forge common config file `config/pmmojs-common.toml`.
+If you are new to PmmoJS, read these pages in order:
+
+1. **[Overview](./overview)** — what PmmoJS gives you and how it fits together
+2. **[Startup Perk Registration](./startupevents/perks)** — creating custom perks with conditions, lifecycle callbacks, and status display
+3. **[PMMO Settings](./serverevents/settings)** — configuring item, block, and entity requirements, XP awards, and bonuses
+4. **[Runtime Events](./serverevents/normal)** — hooking into PMMO's gameplay triggers during actual play
+
+## Quick reference
+
+- **[Config Events](./serverevents/config)** — skills, perks, server settings, auto-values, anti-cheese
+- **[Internal Hooks](./serverevents/internal)** — intercepting handler-level PMMO logic (login, dimension travel, explosions, brewing)
+- **[Reset Defaults](./serverevents/reset-recipes)** — starting from a clean baseline with `config/pmmojs-common.toml`
+- **[Tag Model](./tag-model)** — how tags work in perks, triggers, and internal hooks
+
+## Script types at a glance
+
+| Script folder | What belongs there |
+|---|---|
+| `startup_scripts/` | Perk registration, predicates, direct PMMO data registration, Forge event listeners |
+| `server_scripts/` | Runtime triggers, config editing, gameplay hooks, ProbeJS doc generation |
+| `client_scripts/` | Read-only skill display helpers, client-side UI logic |
+
+## Getting a clean baseline
+
+If you want to replace PMMO's default data with your own custom rules:
+
+1. Enable the relevant switches in `config/pmmojs-common.toml`
+2. Register your custom data through `server_scripts/`
+3. Only the data you define in scripts survives
+
+See [Reset Defaults](./serverevents/reset-recipes) for the full guide.

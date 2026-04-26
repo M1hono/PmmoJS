@@ -5,25 +5,36 @@ hide_meta: true
 
 # 内部钩子
 
-`PmmoJS.internal` 用来覆盖那些不会经过 PMMO `EventTriggerRegistry` 的处理器路径。
+`PmmoJS.internal` 覆盖不经过触发器注册表的 PMMO 处理器路径。当你需要直接拦截 PMMO 的内置处理器逻辑时，使用这些钩子。
 
-如果你要拦截 Project MMO 的登录同步、维度切换检查、坐骑检查、活塞区块追踪、爆炸过滤、玩家死亡 XP 惩罚、药水酿造等逻辑，就应该使用这一组事件。
+## 何时用 internal vs trigger
 
-在 PMMO `1.20.1-1.7.40` 下，当前支持的内部钩子类型有：
+当你想挂接的处理器无法通过 `PmmoJS.trigger` 访问时，使用 `PmmoJS.internal`。通用规则：
 
-- `DIMENSION_TRAVEL`
-- `EXPLOSION`
-- `LOGIN`
-- `MOUNT`
-- `PISTON`
-- `PLAYER_DEATH`
-- `POTION_BREW`
-- `SLEEP_FINISHED`
+- **`PmmoJS.trigger`** —— 经过 `EventTriggerRegistry` 路由的 PMMO 事件。大多数游戏操作都在这里：破坏方块、合成、战斗、移动等。
+- **`PmmoJS.internal`** —— 从未使用触发器注册表的 PMMO 处理器类。这些是特定的引擎级路径：登录、跨维度、爆炸、活塞、玩家死亡、睡觉、药水酿造。
 
-`PMMOInternalEventJS` 有两套不同的控制语义：
+## 支持的内部钩子
 
-- `return false` 或 `event.skipPmmo()` 只会跳过 PMMO 自己的处理逻辑，不会自动取消底层 Forge 行为。
-- `event.deny()` 或 `event.setActionCancelled(true)` 会在 Forge 事件本身支持取消时，直接取消该行为，并同时跳过 PMMO 处理。
+在 PMMO 1.7.40 上，以下内部钩子已被桥接：
+
+| 钩子 ID | 拦截内容 |
+|---|---|
+| `DIMENSION_TRAVEL` | 玩家切换维度 |
+| `EXPLOSION` | 爆炸事件（注入受影响的方块/实体计数） |
+| `LOGIN` | 玩家登录和数据同步 |
+| `MOUNT` | 玩家骑乘实体 |
+| `PISTON` | 活塞区块追踪更新 |
+| `PLAYER_DEATH` | 玩家死亡经验损失处理 |
+| `POTION_BREW` | 药水酿造（也可通过 `EventType.BREW` 访问） |
+| `SLEEP_FINISHED` | 玩家完成睡觉 |
+
+## 两条控制路径
+
+`PMMOInternalEventJS` 给你两种独立控制 PMMO 行为的方式：
+
+- **仅跳过 PMMO：** `event.skipPmmo()` 或 `event.setSkipPmmo(true)` —— PMMO 的处理器逻辑被跳过，但底层 Forge 动作不会被取消。当你希望 PMMO 忽略该事件，但游戏其余部分正常处理时使用。
+- **拒绝动作：** `event.deny()` 或 `event.setActionCancelled(true)` —— 取消被包装的 Forge 动作并跳过 PMMO 的处理器。当你想完全阻止该动作时使用。
 
 ```js
 PmmoJS.internal(PMMOInternalType.DIMENSION_TRAVEL, event => {
@@ -31,16 +42,18 @@ PmmoJS.internal(PMMOInternalType.DIMENSION_TRAVEL, event => {
     if (!player) return
 
     if (player.stages.has('pmmo_bypass_travel')) {
-        event.skipPmmo()
+        event.skipPmmo()  // 允许玩家传送，只是不运行 PMMO 的检查
     }
 
     if (player.stages.has('pmmo_lock_dimensions')) {
-        event.deny()
+        event.deny()  // 完全阻止传送
     }
 })
 ```
 
-对于药水酿造，`POTION_BREW` 会暴露 PMMO 最终要发放的 XP 奖励表，以及 PMMO 自己使用的 brewed 标记逻辑：
+## 药水酿造示例
+
+`POTION_BREW` 比较特殊：桥接层向上下文注入一个追踪标记，并让你控制酿造物品的输出。
 
 ```js
 PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
@@ -53,30 +66,33 @@ PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
 })
 ```
 
-`PMMOInternalEventJS` 常用方法：
+## 爆炸示例
 
-- `getType()`、`getTypeId()`
-- `getForgeEvent()`、`getForgeEventClassName()`
-- `hasPlayer()`、`getPlayer()`、`getServerPlayer()`
-- `shouldSkipPmmo()`、`setSkipPmmo(true)`、`skipPmmo()`
-- `canCancelAction()`、`isActionCancelled()`、`setActionCancelled(true)`、`deny()`
-- `getContext()` 以及一整套 `getContext*` / `putContext*`
-- `getXpAwards()`、`setXpAwards()`、`setXpAward()`、`addXpAward()`
+`EXPLOSION` 会从桥接层接收 `affectedBlockCount` 和 `affectedEntityCount`：
 
-<Callout variant="info">
-    `POTION_BREW` 现在也已经接入 `PmmoJS.trigger(EventType.BREW, ...)`。
-    如果你要处理 PMMO 的 `EventType` 语义，请优先用 `PmmoJS.trigger`。
-    如果你要改的是处理器本身的专属逻辑，请用 `PmmoJS.internal`。
-</Callout>
+```js
+PmmoJS.internal(PMMOInternalType.EXPLOSION, event => {
+    if (event.getContextInt('affectedBlockCount') > 64) {
+        event.setSkipPmmo(true)
+    }
+})
+```
 
-## ProbeJS
+## 内部事件的关键方法
 
-PmmoJS 不需要单独再做一个 ProbeJS 专属 Java 事件。
+- `getType()` 和 `getTypeId()` —— 触发的是哪个内部钩子
+- `getForgeEvent()` 和 `getForgeEventClassName()` —— 底层的 Forge 事件
+- `hasPlayer()`、`getPlayer()`、`getServerPlayer()` —— 相关玩家（如果适用）
+- `shouldSkipPmmo()`、`setSkipPmmo(true)`、`skipPmmo()` —— 跳过 PMMO 的处理器
+- `canCancelAction()`、`isActionCancelled()`、`setActionCancelled(true)`、`deny()` —— 取消 Forge 动作
+- `getContextBoolean(key)`、`getContextString(key)` 等 —— 读取上下文值
+- `putContextBoolean(key, value)`、`putContextString(key, value)` 等 —— 写入上下文值
+- `getXpAwards()`、`setXpAwards(map)`、`setXpAward(skill, amount)`、`addXpAward(skill, amount)` —— XP 管理
 
-ProbeJS 已经提供了 `ProbeJSEvents.generateDoc`，因此推荐做法是：
+## ProbeJS 类型补全
 
-- 在 Java 侧保持完整的 `@Info` 注解与类型化 `Extra`
-- 通过 `ProbeJSEvents.generateDoc` 添加 snippet 或文档变换
-- 直接参考 `run/kubejs/server_scripts/pmmojs_probe_docs.js` 与 `run/kubejs/server_scripts/pmmojs_test_runtime.js` 里的示例
+PmmoJS 同时为 v6 和 v7（Legacy）ProbeJS API 提供 ProbeJS 支持。所有枚举值、事件对象和工具类的类型补全都会在 ProbeJS 生成类型定义时自动提供。
 
-这样 ProbeJS 支持会和标准 KubeJS 机制保持一致，而不是额外再分裂出一套文档事件体系。
+你不需要为 PmmoJS 类型编写自定义的 ProbeJS 事件监听器 —— 它们会在模组初始化时由插件注册。
+
+对于 VSCode 用户，ProbeJS Legacy 插件还提供代码片段（例如输入 `@pmmo_internal` 获取脚手架式的内部处理器代码）。

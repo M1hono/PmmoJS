@@ -1,171 +1,26 @@
 ---
-title: 自定义 Perk 标签
+title: 自定义 Perk Tag
 hide_meta: true
 ---
 
-# 自定义 Perk 标签
+# 自定义 Perk Tag
 
-这一页先回答最常见的问题：自定义 perk 运行时，每种数据到底该放到哪里。
+当你编写自定义 Perk 时，你会用到两个 tag：`ctx.getSettings()` 和 `ctx.getResult()`。这一页解释每个 tag 的用途，以及什么时候用哪个。
 
-更大的标签体系说明见 [标签模型](../tag-model)。
+要了解 tag 系统的全貌（包括触发器上下文 tag 和内部钩子上下文 tag），参见 [Tag 模型](../tag-model)。
 
-## 快速答案
+## `start()` 中的两个 tag
 
-| 你的目标 | 应该用哪里 | 原因 |
-| --- | --- | --- |
-| 给 perk 定义默认调参字段 | `withInt(...)`、`withString(...)`、`withBool(...)`、`defaults(tag => {})` | 这些值会进入 startup 默认标签 |
-| 在 perk 内读取配置或运行期输入 | `ctx.getSettings()` | PMMO 会把默认值、配置、事件输入、前序 perk 输出都合并到这里 |
-| 让状态继续保留到 `tick()` 或 `stop()` | `ctx.getSettings()` | 这份 settings/source tag 会在 perk 生命周期里继续传下去 |
-| 把一次性的结果回写给当前 PMMO 执行流程 | `ctx.getResult()` | PMMO 会把 `start()` 的输出并回这次执行 |
-| 改伤害值或破坏速度 | 从 `ctx.getSettings()` 读，再写入 `ctx.getResult()` | PMMO 会在那里读取事件专用输出 key |
-| 添加只给自己 perk 使用的私有字段 | `ctx.getSettings().put...(...)` | PMMO 会忽略不认识的 key，但你自己的逻辑仍然可以读取 |
+`start()` 是唯一一个能同时访问两个 tag 的回调。
 
-## 数据是怎么流动的
+### `ctx.getSettings()` —— 持久状态
 
-PMMO 调用 perk 之前，`ctx.getSettings()` 已经被组装好了。合并顺序是：
-
-1. `registerPerk` 中定义的 startup 默认值
-2. 命中的 `perks.toml` 配置项
-3. 当前执行路径对应的 PMMO 事件输入
-4. 同一轮执行里前面 perk 已产生的输出
-
-如果合并结果里存在 `skill`，PMMO 还会为当前玩家补入 `level`。
-
-所以大多数情况下，`ctx.getSettings()` 就是你主要读取的标签。
-
-`ctx.getResult()` 更窄一些。只有 `start()` 能拿到它，而且它只负责把结果送回当前这一次 PMMO 执行流程。
-
-## 一个 Perk 的完整生命周期
-
-这张表把每个函数该用哪份标签说明白了：
-
-| 阶段 | 主要 API | 从哪里读 | 往哪里写 | 适合做什么 |
-| --- | --- | --- | --- | --- |
-| 初始化 | `withInt(...)`、`withString(...)`、`defaults(...)` | 还没有运行期标签 | startup 默认 tag | 定义调参字段和私有默认值 |
-| `conditions(ctx)` | `ctx.getSettings()` | 合并后的 settings/source tag | 只返回布尔值 | 决定这次能不能激活 |
-| `start(ctx)` | `ctx.getSettings()`、`ctx.getResult()` | 合并后的 settings/source tag | 持久状态写到 `getSettings()`，一次性输出写到 `getResult()` | 初始化生命周期状态并回写本次执行结果 |
-| `tick(ctx)` | `ctx.getSettings()` | 同一份 settings/source tag | 通常还是同一份 settings tag | 继续使用或更新生命周期状态 |
-| `stop(ctx)` | `ctx.getSettings()` | 同一份 settings/source tag | 同一份 settings tag | 清理 |
-| `status(ctx)` | `ctx.getSettings()` | 同一份 settings/source tag | 只写状态文本 | 给 UI 展示当前状态 |
-
-### 生命周期示例
-
-```js
-PmmoJS.registerPerk(event => {
-  event
-    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
-    .withSkill('combat')
-    .withMinLevel(10)
-    .withDuration(100)
-    .withInt('heal_interval', 20)
-    .withDouble('heal_amount', 1.0)
-    .defaults(tag => {
-      tag.putBoolean('active', false)
-      tag.putLong('started_at', 0)
-    })
-    .conditions(ctx => {
-      return ctx.getPlayer().getHealth() < ctx.getPlayer().getMaxHealth()
-    })
-    .start(ctx => {
-      const settings = ctx.getSettings()
-      settings.putBoolean('active', true)
-      settings.putLong('started_at', ctx.getPlayer().level().getGameTime())
-      ctx.getResult().putString('steady_mind_started', ctx.getPerkId())
-    })
-    .tick(ctx => {
-      const settings = ctx.getSettings()
-      const interval = settings.getIntOr('heal_interval', 20)
-      const amount = settings.getDoubleOr('heal_amount', 1.0)
-
-      if (settings.getBooleanOr('active', false) && ctx.getElapsedTicks() % interval === 0) {
-        ctx.getPlayer().heal(amount)
-      }
-    })
-    .stop(ctx => {
-      ctx.getSettings().putBoolean('active', false)
-    })
-    .status(ctx => {
-      const settings = ctx.getSettings()
-      ctx.clearLines()
-      ctx.addLine(`active: ${settings.getBooleanOr('active', false)}`)
-      ctx.addLine(`started_at: ${settings.getLongOr('started_at', 0)}`)
-    })
-    .register()
-})
-```
-
-### 这个例子里的标签长什么样
-
-builder 先创建的 startup 默认值：
-
-```js
-{
-  skill: 'combat',
-  min_level: 10,
-  duration: 100,
-  heal_interval: 20,
-  heal_amount: 1.0,
-  active: false,
-  started_at: 0
-}
-```
-
-进入 `start(ctx)` 时，PMMO 合并后的 `ctx.getSettings()` 常见形态：
-
-```js
-{
-  skill: 'combat',
-  level: 18,
-  min_level: 10,
-  duration: 100,
-  heal_interval: 20,
-  heal_amount: 1.0,
-  active: false,
-  started_at: 0
-}
-```
-
-`start(ctx)` 写完后的结果：
-
-```js
-ctx.getSettings() = {
-  skill: 'combat',
-  level: 18,
-  min_level: 10,
-  duration: 100,
-  heal_interval: 20,
-  heal_amount: 1.0,
-  active: true,
-  started_at: 123456
-}
-
-ctx.getResult() = {
-  steady_mind_started: 'kubejs:steady_mind'
-}
-```
-
-关键区别只有一句话：
-
-- `active` 和 `started_at` 写进 `ctx.getSettings()`，因为后面的回调还要继续读它们。
-- `steady_mind_started` 写进 `ctx.getResult()`，因为它只服务当前这一次 PMMO 执行流程。
-
-## `start()` 里的两份标签
-
-### `ctx.getSettings()`
-
-当这个值后面还要继续存在时，用它。
-
-常见场景：
-
-- `tick()` 还要读取的开关
-- perk 自己维护的计数器或标记
-- 想在 `start()` 里标准化一次、后面继续复用的配置值
-
-示例：
+当某个值需要留存到后续回调（如 `tick()` 或 `stop()`）时使用。
 
 ```js
 .start(ctx => {
   ctx.getSettings().putBoolean('active', true)
+  ctx.getSettings().putLong('started_at', ctx.getPlayer().level().getGameTime())
 })
 .tick(ctx => {
   if (ctx.getSettings().getBooleanOr('active', false)) {
@@ -174,17 +29,11 @@ ctx.getResult() = {
 })
 ```
 
-### `ctx.getResult()`
+`ctx.getSettings()` 初始是一个合并后的 tag，包含你的启动默认值、`perks.toml` 覆盖、PMMO 事件输入以及更早 Perk 的输出。你写入的任何内容都会在 `tick()` 和 `stop()` 中持续存在。PMMO 会忽略它不认识的键，所以你可以自由存储私有生命周期状态。
 
-当这个值是给 PMMO 当前事件处理流程用的，而不是给后续生命周期状态用的，就写这里。
+### `ctx.getResult()` —— 一次性输出
 
-常见场景：
-
-- 用 `DAMAGE_OUT` 改最终伤害
-- 用 `BREAK_SPEED_OUTPUT_VALUE` 改挖掘速度
-- 写出这次执行的一次性结果，供同一轮里的后续 perk 读取
-
-示例：
+当值只在当前 PMMO 执行趟次中有意义时使用。PMMO 将结果 tag 合并回当前执行中，供同一趟次中的其他 Perk 读取。
 
 ```js
 .start(ctx => {
@@ -195,11 +44,13 @@ ctx.getResult() = {
 })
 ```
 
-## 最常见的几种写法
+典型用途：替换伤害值、调整挖掘速度，或者发出可能被同一趟次中另一个 Perk 消费的事件输出。
 
-### 1. 普通配置字段
+## 常见模式
 
-如果你只是想加一个可调参数，就在 defaults 里写，然后从 settings 里读。
+### 可配置字段
+
+在构建器中设置默认值，在运行时读取：
 
 ```js
 PmmoJS.registerPerk(event => {
@@ -216,9 +67,9 @@ PmmoJS.registerPerk(event => {
 })
 ```
 
-### 2. 需要传给 `tick()` 或 `stop()` 的状态
+### 需要跨回调持久化的状态
 
-写到 `ctx.getSettings()`。
+写入 `ctx.getSettings()`：
 
 ```js
 .start(ctx => {
@@ -226,13 +77,13 @@ PmmoJS.registerPerk(event => {
 })
 .stop(ctx => {
   const startedAt = ctx.getSettings().getLongOr('started_at', 0)
-  // 在这里使用这个值
+  // 使用存储的值
 })
 ```
 
-### 3. 要回写给 PMMO 的事件结果
+### 供 PMMO 使用的事件输出
 
-写到 `ctx.getResult()`。
+写入 `ctx.getResult()`：
 
 ```js
 .start(ctx => {
@@ -243,9 +94,9 @@ PmmoJS.registerPerk(event => {
 })
 ```
 
-### 4. 只给自己 perk 使用的私有字段
+### 只有私有字段的 Perk
 
-自定义 key 完全可以用。PMMO 会忽略不认识的 key。
+自定义键完全没问题 —— PMMO 会忽略它们：
 
 ```js
 .defaults(tag => {
@@ -254,138 +105,62 @@ PmmoJS.registerPerk(event => {
 })
 ```
 
-## 标准 PMMO perk key
+## PMMO 标准 Perk 键
 
-这些是绝大多数 perk 都会用到的共享 key。
+以下是 PMMO 识别的一些键。你通过构建器方法设置它们，PMMO 从合并后的设置 tag 中读取。
 
-| Key | 类型 | 含义 | PmmoJS builder |
-| --- | --- | --- | --- |
-| `skill` | string | PMMO 为这个 perk 解析的技能 | `withSkill(...)` |
-| `level` | int | `skill` 对应的当前玩家等级 | PMMO 自动注入 |
-| `cooldown` | int | 这个 perk id 的共享冷却 | `withCooldown(...)` |
-| `chance` | double | `0.0` 到 `1.0` 的触发概率 | `withChance(...)` |
-| `min_level` | int | `skill` 的最低等级要求 | `withMinLevel(...)` |
-| `max_level` | int | `skill` 的最高等级限制 | `withMaxLevel(...)` |
-| `per_x_level` | int | 只有等级能被该值整除时才运行 | `withPerXLevel(...)` |
-| `milestones` | 数字列表 | 只有在列出的等级时才运行 | `withMilestones(...)` |
-| `duration` | int | ticking 持续时间；`0` 会跳过 `tick()` | `withDuration(...)` |
+| 键 | 类型 | 设置方式 |
+|---|---|---|
+| `skill` | string | `withSkill(...)` |
+| `level` | int | 由 PMMO 在运行时注入 |
+| `cooldown` | int | `withCooldown(...)` |
+| `chance` | double | `withChance(...)` |
+| `min_level` | int | `withMinLevel(...)` |
+| `max_level` | int | `withMaxLevel(...)` |
+| `per_x_level` | int | `withPerXLevel(...)` |
+| `milestones` | int[] | `withMilestones(...)` |
+| `duration` | int | `withDuration(...)` |
 
-## 你最可能会用到的 PMMO 事件 key
+## Perk I/O 的 PMMO 事件键
 
-大部分自定义 perk 实际上只会碰到少量事件 key。
+当你的 Perk 处理 PMMO 事件（如伤害或方块破坏）时，你从 `ctx.getSettings()` 读取输入，向 `ctx.getResult()` 写入输出：
 
-| 事件类型 | 从 `ctx.getSettings()` 读取 | 向 `ctx.getResult()` 写入 |
-| --- | --- | --- |
+| 事件类型 | 从 settings 读取 | 写入到 result |
+|---|---|---|
 | `BREAK_SPEED` | `BREAK_SPEED_INPUT_VALUE`、`BLOCK_POS` | `BREAK_SPEED_OUTPUT_VALUE` |
 | `DEAL_DAMAGE`、`RECEIVE_DAMAGE` | `DAMAGE_IN` | `DAMAGE_OUT` |
-| `ENCHANT` | `STACK`、`PLAYER_ID`、`ENCHANT_LEVEL`、`ENCHANT_NAME` | 没有文档化的输出 key |
-| `SMELT` | `STACK` | 没有文档化的输出 key |
-| `JUMP`、`SPRINT_JUMP`、`CROUCH_JUMP` | 没有文档化的输入 key | `JUMP_OUT` |
-| `SHIELD_BLOCK` | `DAMAGE_IN` | 没有文档化的输出 key |
+| `JUMP`、`SPRINT_JUMP`、`CROUCH_JUMP` | — | `JUMP_OUT` |
+| `SHIELD_BLOCK` | `DAMAGE_IN` | — |
+| `ENCHANT` | `STACK`、`PLAYER_ID`、`ENCHANT_LEVEL`、`ENCHANT_NAME` | — |
+| `SMELT` | `STACK` | — |
 
-PMMO 还文档化了 `APIUtils.SERIALIZED_AWARD_MAP` 这个原始 XP 奖励输出通道。PmmoJS 目前没有为它提供专门的 `PerkTagJS` helper。
+## 构建器方法到键的映射
 
-## `PerkTagJS` 能存什么
+每个构建器方法都会向启动默认 tag 写入一个特定的键：
 
-`PerkTagJS` 支持脚本里最常用的这些值形态：
-
-| 形态 | 方法 |
-| --- | --- |
-| string | `putString(...)` |
-| boolean | `putBoolean(...)` |
-| int | `putInt(...)` |
-| long | `putLong(...)` |
-| float | `putFloat(...)` |
-| double | `putDouble(...)` |
-| string 列表 | `putStringList(...)` |
-| 数字列表 | `putNumberList(...)` |
-| 嵌套 compound | `putCompound(...)`、`getOrCreateCompound(...)` |
-| 从另一个 compound 合并 | `merge(...)` |
-
-说明：
-
-- `putNumberList(...)` 会把值存成 double
-- 未知 key 是允许的
-- `PerkTagJS` 不是一个面向任意 `Tag` 子类的完整原始 NBT 编辑器
-
-## Builder 与 key 的对应关系
-
-startup builder 写入的就是 PMMO 自己 perk 配置里使用的 key 名。
-
-| Builder 方法 | 写入的 key |
-| --- | --- |
-| `withSkill(skill)` | `skill` |
-| `withCooldown(ticks)` | `cooldown` |
-| `withDuration(ticks)` | `duration` |
-| `withChance(value)` | `chance` |
-| `withMinLevel(level)` | `min_level` |
-| `withMaxLevel(level)` | `max_level` |
-| `withPerXLevel(levelStep)` | `per_x_level` |
-| `withMilestones(values)` | `milestones` |
-| `withString(key, value)` | 自定义字符串 key |
-| `withBool(key, value)` | 自定义布尔 key |
-| `withInt(key, value)` | 自定义 int key |
-| `withLong(key, value)` | 自定义 long key |
-| `withFloat(key, value)` | 自定义 float key |
-| `withDouble(key, value)` | 自定义 double key |
-| `withStringList(key, values)` | 自定义字符串列表 key |
-| `withNumberList(key, values)` | 自定义数字列表 key |
-| `withCompound(key, value)` | 自定义嵌套 compound key |
-| `defaults(tag => {})` | 通过 `PerkTagJS` 组合写入以上任意 key |
-
-## 完整事件输出示例
-
-当 perk 的主要任务是读取 PMMO 事件输入，再输出 PMMO 事件结果时，写法通常是这样：
-
-```js
-PmmoJS.registerPerk(event => {
-  event
-    .create('kubejs:damage_guard', PMMOPerkSide.SERVER)
-    .withSkill('combat')
-    .withDouble('damage_multiplier', 0.8)
-    .start(ctx => {
-      const incoming = ctx.getSettings().getDoubleOr('DAMAGE_IN', 0)
-      const multiplier = ctx.getSettings().getDoubleOr('damage_multiplier', 0.8)
-
-      if (incoming > 0) {
-        ctx.getResult().putDouble('DAMAGE_OUT', incoming * multiplier)
-      }
-    })
-    .register()
-})
-```
-
-这个例子不需要 `tick()` 或 `stop()`，因为它没有自己的长生命周期状态，只是把当前这次事件输入转换成当前这次事件输出。
-
-## 完整示例
-
-```js
-PmmoJS.registerPerk(event => {
-  event
-    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
-    .withSkill('combat')
-    .withMinLevel(10)
-    .withDuration(100)
-    .withInt('heal_interval', 20)
-    .start(ctx => {
-      ctx.getSettings().putBoolean('active', true)
-      ctx.getResult().putString('started_by', ctx.getPerkId())
-    })
-    .tick(ctx => {
-      const interval = ctx.getSettings().getIntOr('heal_interval', 20)
-      if (ctx.getSettings().getBooleanOr('active', false) && ctx.getElapsedTicks() % interval === 0) {
-        ctx.getPlayer().heal(1)
-      }
-    })
-    .stop(ctx => {
-      ctx.getSettings().remove('active')
-    })
-    .register()
-})
-```
+| 构建器方法 | 写入的键 |
+|---|---|
+| `withSkill(s)` | `skill` |
+| `withCooldown(n)` | `cooldown` |
+| `withDuration(n)` | `duration` |
+| `withChance(n)` | `chance` |
+| `withMinLevel(n)` | `min_level` |
+| `withMaxLevel(n)` | `max_level` |
+| `withPerXLevel(n)` | `per_x_level` |
+| `withMilestones(arr)` | `milestones` |
+| `withString(k, v)` | 自定义键（string） |
+| `withBool(k, v)` | 自定义键（boolean） |
+| `withInt(k, v)` | 自定义键（int） |
+| `withLong(k, v)` | 自定义键（long） |
+| `withFloat(k, v)` | 自定义键（float） |
+| `withDouble(k, v)` | 自定义键（double） |
+| `withStringList(k, arr)` | 自定义键（string list） |
+| `withNumberList(k, arr)` | 自定义键（double list） |
+| `withCompound(k, v)` | 自定义键（compound） |
+| `defaults(tag => {})` | 通过 `PerkTagJS` 设置任意组合 |
 
 ## 相关页面
 
-- [启动阶段 Perk 注册](./perks)
-- [标签模型](../tag-model)
+- [启动 Perk 注册](./perks)
+- [Tag 模型](../tag-model)
 - [配置事件](../serverevents/config)

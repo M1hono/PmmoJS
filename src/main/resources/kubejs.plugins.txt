@@ -1,1 +1,3 @@
 com.pickaid.pmmojs.kubejs.PMMOKubeJSPlugin
+com.pickaid.pmmojs.kubejs.probe.PmmoJSProbePlugin
+com.pickaid.pmmojs.kubejs.probe.PmmoJSLegacyProbePlugin

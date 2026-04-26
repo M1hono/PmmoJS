@@ -1,87 +1,96 @@
 # PmmoJS 概览
 
-`PmmoJS` 是一个面向 Forge `1.20.1` 的 Project MMO KubeJS 附属模组。
+PmmoJS 是 [Project MMO](https://www.curseforge.com/minecraft/mc-mods/project-mmo) 在 Forge 1.20.1 上的 KubeJS 附属模组。
 
-它为整合包作者提供三层控制能力：
+它将 PMMO 的 API 封装成干净的 KubeJS 事件和辅助类，让你能用 JavaScript 配置 PMMO 的每一个部分 —— 技能、需求、经验奖励、Perk、触发器等等 —— 不写任何 Java 代码。
 
-1. 启动阶段注册自定义 PMMO 条件谓词与自定义 Perk 类型。
-2. 通过服务端配置事件修改 `skills.toml`、auto-values、perks、globals 与 anti-cheese 等 PMMO 配置。
-3. 通过运行时事件接入 XP、附魔、熔炉、回收、伤害惩罚、PMMO 的 `EventType` 触发器，以及 PMMO 处理器级内部钩子。
+## 三层控制能力
 
-与 perk 编写直接相关的参考页：
+PmmoJS 的功能按三个层级组织，对应 KubeJS 的脚本类型：
 
-- [标签模型](./tag-model)
-- [自定义 Perk 标签](./startupevents/custom-perk-tags)
-- [清空默认数据](./serverevents/reset-recipes)
+### 启动层（`startup_scripts/`）
 
-如果你希望 PMMO 从更干净的基线开始运行，先改 `config/pmmojs-common.toml`，再通过 KubeJS 把整合包真正需要的数据加回去。
+在游戏世界加载之前完成的注册：
 
-## 事件分组
+- **自定义 Perk** —— 通过 `PmmoJS.registerPerk(...)` 定义新的 Perk 类型。每个 Perk 拥有完整的生命周期回调：条件检查、启动、持续运行、关闭、状态显示。
+- **自定义谓词** —— 通过 `PmmoJS.registerPredicate(...)` 注册 PMMO 会评估的条件检查。
+- **直接数据注册** —— 通过 `PmmoHelper` 直接将需求数据、经验奖励、加成和触发器监听器注册到 PMMO 的 API 中。
 
-启动事件：
+### 配置层（`server_scripts/`）
 
-- `PmmoJS.registerPredicate`
-- `PmmoJS.registerPerk`
+通过 KubeJS 事件编辑 PMMO 的配置文件：
 
-服务端配置事件：
+| 事件 | 控制内容 |
+|---|---|
+| `PmmoJS.skillsConfig(...)` | 添加、替换或删除技能 |
+| `PmmoJS.perksConfig(...)` | 编辑 PMMO 配置中的已有 Perk 条目 |
+| `PmmoJS.serverConfig(...)` | 服务器级设置，如最大等级、矿脉挖掘、死亡惩罚 |
+| `PmmoJS.autoValueConfig(...)` | 方块和物品的自动生成值 |
+| `PmmoJS.antiCheeseConfig(...)` | AFK 检测和收益递减 |
+| `PmmoJS.globalsConfig(...)` | 全局 NBT 路径和常量 |
+| `PmmoJS.settings(...)` | 物品、方块、实体、生物群系和维度的需求与经验数据 |
 
-- `PmmoJS.settings`
-- `PmmoJS.globalsConfig`
-- `PmmoJS.skillsConfig`
-- `PmmoJS.perksConfig`
-- `PmmoJS.serverConfig`
-- `PmmoJS.autoValueConfig`
-- `PmmoJS.antiCheeseConfig`
+### 运行时层（`server_scripts/`）
 
-运行时事件：
+在实际游戏过程中触发的钩子：
 
-- `PmmoJS.trigger`
-- `PmmoJS.internal`
-- `PmmoJS.xp`
-- `PmmoJS.enchant`
-- `PmmoJS.furnace`
-- `PmmoJS.salvage`
-- `PmmoJS.itemstackDamagePenalty`
-- `PmmoJS.entityDamagePenalty`
+| 事件 | 触发时机 |
+|---|---|
+| `PmmoJS.trigger(EventType, ...)` | PMMO 触发器事件（挖掘、合成、伤害、跳跃等） |
+| `PmmoJS.internal(PMMOInternalType, ...)` | PMMO 处理器级钩子（登录、跨维度、爆炸、酿造） |
+| `PmmoJS.xp(...)` | 玩家获得 PMMO 经验时 |
+| `PmmoJS.enchant(...)` | 玩家附魔物品时 |
+| `PmmoJS.furnace(...)` | 熔炉烧炼时 |
+| `PmmoJS.salvage(...)` | 玩家回收物品时 |
+| `PmmoJS.itemstackDamagePenalty(...)` | 调整物品耐久损耗 |
+| `PmmoJS.entityDamagePenalty(...)` | 调整实体伤害 |
 
-## 绑定对象
+## 脚本绑定
 
-插件会向脚本环境注册这些常用绑定：
+PmmoJS 会为你的 KubeJS 脚本注册以下绑定，可用的绑定取决于你在哪个脚本类型中：
 
-- `EventType`
-- `PMMOInternalType`
-- `PMMOPerkSide`
-- `ModifierDataType`
-- `ObjectType`
-- `ReqType`
-- `PmmoHelper`
+**启动脚本：** `PmmoHelper`、`TagBuilder`、`NbtPathBuilder`
 
-按脚本类型区分：
+**服务端脚本：** `PmmoHelper`、`SkillHelper`、`SKillHelper`、`CustomReqMap`、`TagBuilder`、`NbtPathBuilder`、`SalvageBuilder`
 
-- `startup_scripts/`: `PmmoHelper`、`TagBuilder`、`NbtPathBuilder`
-- `server_scripts/`: `PmmoHelper`、`SkillHelper`、`SKillHelper`、`CustomReqMap`、`TagBuilder`、`NbtPathBuilder`、`SalvageBuilder`
-- `client_scripts/`: 只读的 `SkillHelper`、`SKillHelper`
+**客户端脚本：** `SkillHelper`、`SKillHelper`（仅限只读访问技能数据）
 
-`PmmoHelper` 是专门为 KubeJS 整理过的 PMMO 辅助入口，尽量避免重载导致的脚本歧义。它封装了这些高频能力：
+### PmmoHelper
 
-- 读取与修改技能等级、技能 XP
-- 查询需求、经验奖励与合并后的加成
-- 直接注册 PMMO 数据
-- 队伍与矿脉连锁相关逻辑
-- 手动发放 XP、触发回收
-- 通过 `getTriggerTypeIds()` 与 `getInternalTypeIds()` 枚举当前桥接能力
-- 需要时直接注册 PMMO trigger listener，而不是只通过 `PmmoJS.trigger`
+`PmmoHelper` 是主要的工具类。它将 PMMO 的内部 API 封装为清晰的静态方法：
 
-`PmmoJS.trigger(EventType.BREW, ...)` 现在在 `1.20.1` 上已经可用，而那些不会走 trigger registry 的 PMMO 处理器则统一通过 `PmmoJS.internal(...)` 暴露。
+- **技能状态：** `getSkillLevel`、`setSkillLevel`、`addSkillXp`、`getAllSkillLevels`
+- **数据查询：** `getItemXpAwards`、`getBlockRequirements`、`getConsolidatedModifiers`
+- **直接注册：** `registerRequirementData`、`registerXpAwardData`、`registerBonusData`、`registerTriggerListener`
+- **队伍系统：** `getPartyMembers`、`getPartyMembersInRange`、`inviteToParty`
+- **矿脉挖掘：** `applyVeinMining`、`regenerateVeinCharge`、`getCurrentVeinCharge`
+- **类型发现：** `getTriggerTypeIds`、`getInternalTypeIds`、`getEventTypeIds`、`getReqTypeIds`、`getObjectTypeIds`
 
-## 版本说明
+### 类型枚举
 
-- 目标 Minecraft 版本：`1.20.1`
-- 目标 PMMO 版本线：`1.7.40`
-- 开发环境中保留了 EMI 运行时依赖，用于复现配方查看器与标签重载相关问题
+PmmoJS 同时暴露 PMMO 的类型枚举，让你对每个值都有自动补全：
 
-<Callout>
-    使用 `startup_scripts/` 处理 predicate、perk 类型、直接 PMMO 数据注册，
-    以及 `ForgeEvents.onEvent(...)`。使用 `server_scripts/` 处理 PMMO 配置、
-    运行期事件，以及 `ProbeJSEvents.generateDoc(...)`。
-</Callout>
+- `EventType` —— PMMO 事件类型名称（如 `BLOCK_BREAK`、`CRAFT`、`DEATH`）
+- `PMMOInternalType` —— 内部钩子类型 ID（如 `DIMENSION_TRAVEL`、`LOGIN`）
+- `ReqType` —— 需求类型名称（如 `WEAPON`、`TOOL`、`KILL`）
+- `ObjectType` —— 对象类型名称（如 `ITEM`、`BLOCK`、`ENTITY`）
+- `ModifierDataType` —— 修正数据类型（如 `BIOME`、`HELD`、`WORN`）
+- `PMMOPerkSide` —— `SERVER`、`CLIENT` 或 `BOTH`
+
+## 版本兼容
+
+| 组件 | 版本 |
+|---|---|
+| Minecraft | 1.20.1 |
+| Project MMO | 1.7.40 |
+| KubeJS | 2001.6.5-build.16+ |
+| ProbeJS（可选） | v6 或 v7（Legacy） |
+
+## 何时用启动脚本 vs 服务端脚本
+
+这是最容易混淆的地方。规则很简单：
+
+- **启动脚本** 在世界加载前运行。用于必须在加载时存在的定义和注册。
+- **服务端脚本** 在世界加载后运行。用于任何响应游戏事件或需要在重载周期中修改配置的逻辑。
+
+把运行时逻辑放在启动脚本里会失败。把注册逻辑放在服务端脚本里可能可以运行，但这并不是正确的生命周期。

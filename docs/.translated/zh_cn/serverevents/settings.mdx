@@ -3,22 +3,15 @@ title: PMMO 设置
 hide_meta: true
 ---
 
-# PMMO 设置事件
+# PMMO 设置
 
-`PmmoJS.settings` 是从 `server_scripts/` 注册 PMMO 对象数据的主桥接入口。
+`PmmoJS.settings` 是在 `server_scripts/` 中为物品、方块、实体、生物群系和维度注册 PMMO 数据的主要方式。
 
-## 单目标 builder
+把它理解为替代手动编辑 PMMO 的 JSON 配置文件。你改写成 JavaScript，数据通过 PMMO 的 API 干净地应用。
 
-这些方法一次只创建一个 builder：
+## 单个目标
 
-- `event.item(itemOrId)`
-- `event.block(blockOrId)`
-- `event.entity(entityTypeOrId)`
-- `event.biome(id)`
-- `event.dimension(id)`
-- `event.generic(objectType, objectOrId)`
-
-对于 `item`、`block`、`entity`，现在既可以传注册对象，也可以直接传注册表 id 字符串。
+当你需要逐个配置对象时使用：
 
 ```js
 PmmoJS.settings(event => {
@@ -41,25 +34,13 @@ PmmoJS.settings(event => {
 })
 ```
 
-## 批量应用 helper
+可用的目标方法：`event.item(id)`、`event.block(id)`、`event.entity(id)`、`event.biome(id)`、`event.dimension(id)`、`event.generic(objectType, id)`。
 
-这些方法会把同一个 builder 回调应用到多个目标：
+你可以传入注册表对象或字符串 ID。对于物品、方块和实体，两者都支持。
 
-- `event.items(targets, callback)`
-- `event.blocks(targets, callback)`
-- `event.entities(targets, callback)`
-- `event.biomes(targets, callback)`
-- `event.dimensions(targets, callback)`
-- `event.genericMany(objectType, targets, callback)`
+## 批量目标
 
-`targets` 可以是：
-
-- 单个 id
-- 单个注册对象
-- JS 数组
-- Java list 或其他 iterable
-
-当你要一次给很多对象套用同一套 PMMO 规则时，这就是推荐写法。
+将相同的配置一次应用到多个目标 —— 比重复相同的设置代码干净得多：
 
 ```js
 PmmoJS.settings(event => {
@@ -83,28 +64,30 @@ PmmoJS.settings(event => {
 })
 ```
 
-## 通用 builder 方法
+可用的批量方法：`event.items(targets, callback)`、`event.blocks(targets, callback)`、`event.entities(targets, callback)`、`event.biomes(targets, callback)`、`event.dimensions(targets, callback)`、`event.genericMany(objectType, targets, callback)`。
 
-所有设置 builder 都继承这些常用方法：
+`targets` 参数接受单个 ID 字符串、单个注册表对象、JS 数组或任何可迭代对象。
 
-- `setRequirement(reqType, skill, level)`
-- `requirement(reqType, map)`
-- `setXp(eventType, skill, amount)`
-- `xp(eventType, map)`
-- `override(boolean)`
+## 通用构建器方法
 
-## 按类型提供的额外能力
+所有设置构建器共享这些方法：
 
-根据 builder 的具体类型，你还可以使用：
+- `setRequirement(reqType, skill, level)` —— 要求某项技能达到指定等级才能使用该对象
+- `requirement(reqType, map)` —— 一次性设置多个需求（例如 `{combat: 10, mining: 5}`）
+- `setXp(eventType, skill, amount)` —— 为某项行为奖励 XP
+- `xp(eventType, map)` —— 一次性设置多个 XP 奖励
+- `override(boolean)` —— 设为 `true` 时，替换 PMMO 的默认数据而不是与它合并
 
-- 物品回收配置
-- 物品与实体伤害类型 XP 注册
-- 正负面药水效果注册
-- 地点类 mob modifier
-- 矿脉连锁充能配置
-- NBT requirement、NBT XP、NBT bonus builder
+## 各类型专属功能
 
-例如：
+根据构建器类型，你还能获得：
+
+- **物品：** 回收配置、矿脉挖掘设置、基于 NBT 的需求和 XP
+- **实体：** 伤害类型 XP 注册、正面/负面生物效果
+- **方块：** 矿脉挖掘数据、NBT 需求
+- **位置：** 生物群系和维度的生物修正
+
+示例 —— 在物品上配置矿脉挖掘：
 
 ```js
 PmmoJS.settings(event => {
@@ -117,44 +100,31 @@ PmmoJS.settings(event => {
 })
 ```
 
-## 清空默认数据
+## 清除默认数据
 
-如果你想不写脚本就清掉大类 PMMO 默认数据，优先改 `config/pmmojs-common.toml`：
+如果你想清除 PMMO 的内置数据并从零开始，使用 `config/pmmojs-common.toml`：
 
-- `disableDefaultSettings.all`
-- `disableDefaultSettings.skills`
-- `disableDefaultSettings.perks`
-- `disableDefaultSettings.requirements`
-- `disableDefaultSettings.xpAwards`
-- `disableDefaultSettings.itemExtras`
-- `disableDefaultSettings.blockVeinData`
+```toml
+[disableDefaultSettings]
+all = false
+skills = false
+perks = false
+requirements = false
+xpAwards = false
+itemExtras = false
+blockVeinData = false
+```
 
-设置事件还保留这些旧的辅助方法：
+重置发生在 KubeJS 脚本运行之前，所以你的自定义数据始终生效。
 
-- `clearVanillaItemSettings()`
-- `clearVanillaBlockSettings()`
-- `clearVanillaEntitySettings()`
+设置事件还有旧版辅助方法 `clearVanillaItemSettings()`、`clearVanillaBlockSettings()` 和 `clearVanillaEntitySettings()`。这些只重置需求数据 —— 不触及 XP 奖励、加成、效果、回收或矿脉数据。需要完整重置时使用通用配置。
 
-应把它们看作需求重置 helper，而不是完整的 PMMO 全量清空接口。
+## 枚举命名
 
-它们只能处理大范围的 requirement override，不能完整重置这些类别：
+PMMO 的枚举名称区分大小写，严格遵循 PMMO 源代码。一些容易踩坑的值：
 
-- XP 奖励
-- bonus
-- 正负面效果
-- salvage
-- vein 数据
-- biome 与 dimension 设置
+- `ReqType.ENTITY_INTERACT` 存在，`ReqType.ENTITY` 不存在
+- `EventType.BLOCK_BREAK` 存在，`EventType.BREAK` 不存在
+- `EventType.DEATH` 存在，`EventType.KILL` 不存在
 
-重置顺序、脚本写法与 location 限制请看 [清空默认数据](./reset-recipes)。
-
-## 枚举名要以 PMMO 实际版本为准
-
-请使用当前 PMMO jar 里真实存在的枚举名。例如：
-
-- `ReqType.ENTITY_INTERACT` 存在
-- `ReqType.ENTITY` 不存在
-- `EventType.BLOCK_BREAK` 存在
-- `EventType.BREAK` 不存在
-- `EventType.DEATH` 存在
-- `EventType.KILL` 不存在
+如果你使用 ProbeJS，类型补全会自动显示正确的值。

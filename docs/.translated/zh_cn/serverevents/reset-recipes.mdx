@@ -1,17 +1,15 @@
 ---
-title: 清空默认数据
+title: 重置默认值
 hide_meta: true
 ---
 
-# 清空默认数据
+# 重置默认值
 
-这一页说明如何让 PMMO 从更小、甚至几乎全自定义的数据集开始运行。
+当你需要用自定义规则替换 PMMO 的内置数据时，你首先需要一种清除默认值的方式。PmmoJS 提供两种方案：基于配置的批量重置和基于脚本的定向删除。
 
-旧的重置示例包不再作为正式工作流的一部分保留。现在推荐直接把下面的写法放进你自己的 `server_scripts/`，或者在适用时优先使用通用配置。
+## 推荐方式：使用通用配置
 
-## 首选方案：通用配置
-
-对于 PmmoJS 已经能安全整类清空的 PMMO 数据，优先使用 `config/pmmojs-common.toml`：
+从空白基线开始最干净的方法是 `config/pmmojs-common.toml`：
 
 ```toml
 [disableDefaultSettings]
@@ -24,32 +22,38 @@ itemExtras = false
 blockVeinData = false
 ```
 
-可用开关：
+每个开关控制一个类别：
 
-- `disableDefaultSettings.all`：开启下面所有受支持的类别
-- `disableDefaultSettings.skills`：在 `PmmoJS.skillsConfig(...)` 之前移除 PMMO 默认技能
-- `disableDefaultSettings.perks`：在 `PmmoJS.perksConfig(...)` 之前清空 PMMO 默认 perk 条目
-- `disableDefaultSettings.requirements`：在 `PmmoJS.settings(...)` 之前清空物品、方块、实体需求数据
-- `disableDefaultSettings.xpAwards`：在 `PmmoJS.settings(...)` 之前清空物品、方块、实体 XP 奖励数据
-- `disableDefaultSettings.itemExtras`：在 `PmmoJS.settings(...)` 之前清空物品 bonus、正负面效果、salvage 与 item vein 数据
-- `disableDefaultSettings.blockVeinData`：在 `PmmoJS.settings(...)` 之前清空方块 vein-mining 数据
+| 开关 | 清除内容 |
+|---|---|
+| `all` | 下面列出的所有内容 |
+| `skills` | PMMO 默认技能 |
+| `perks` | PMMO 默认 Perk 条目 |
+| `requirements` | 物品、方块和实体的需求数据 |
+| `xpAwards` | 物品、方块和实体的 XP 奖励数据 |
+| `itemExtras` | 物品加成、正面/负面效果、回收、矿脉数据 |
+| `blockVeinData` | 方块矿脉挖掘数据 |
 
-顺序很重要：先清默认数据，再执行你的 KubeJS 脚本。所以清空之后，你仍然可以把自己的配置完整加回来。
+执行顺序保证你的脚本始终生效：
 
-## 什么时候该用脚本
+1. PmmoJS 读取通用配置
+2. 启用的类别被清除
+3. 你的 KubeJS 脚本运行并应用你的自定义数据
 
-当你需要的是局部控制，而不是整类清空时，用 KubeJS 脚本更合适。
+## 何时使用脚本代替
 
-例如：
+当你不需要清除整个类别，只需要定向控制时，使用 KubeJS：
 
-- 保留大部分 PMMO 默认内容，只清某一类 requirement，可用 `clearVanillaItemSettings()`
-- 只清某一个 `EventType` 下的 perk 列表，可用 `event.clearPerks(EventType.SKILL_UP)`
-- 在通用配置清底后，只重建少量物品、方块、实体规则
-- 通过显式 id 控制 biome 或 dimension 设置
+- 清除一个需求族：`event.clearVanillaItemSettings()`
+- 清除一个 Perk 事件列表：`event.clearPerks(EventType.SKILL_UP)`
+- 移除单个 Perk：`event.removePerkType('pmmo:fireworks')`
+- 通用配置清除后覆盖特定物品
 
-## 清空后重建技能
+## 重置后重建
 
-如果启用了 `disableDefaultSettings.skills = true`，就需要把真正要保留的技能重新定义出来：
+### 技能
+
+如果你清除了 `skills`，定义你的整合包实际使用的技能：
 
 ```js
 PmmoJS.skillsConfig(event => {
@@ -67,9 +71,9 @@ PmmoJS.skillsConfig(event => {
 })
 ```
 
-## 清空后重建 Perk
+### Perk
 
-如果启用了 `disableDefaultSettings.perks = true`，就只把整合包真正需要的 perk 条目加回来：
+如果你清除了 `perks`，只加回你需要的条目：
 
 ```js
 PmmoJS.perksConfig(event => {
@@ -83,9 +87,9 @@ PmmoJS.perksConfig(event => {
 })
 ```
 
-## 清空后重建对象设置
+### 物品设置
 
-如果你清掉了 requirement、XP 奖励或 item extras，就只把自己的规则重新写回去：
+如果你清除了需求、XP 奖励或物品附加数据：
 
 ```js
 PmmoJS.settings(event => {
@@ -100,23 +104,21 @@ PmmoJS.settings(event => {
 })
 ```
 
-## 旧的需求清空辅助方法
+## 旧版需求辅助方法
 
-`PmmoJS.settings(...)` 仍然暴露了这些方法：
+设置事件还保留了以下辅助方法用于向后兼容：
 
-- `clearVanillaItemSettings()`
-- `clearVanillaBlockSettings()`
-- `clearVanillaEntitySettings()`
+- `event.clearVanillaItemSettings()`
+- `event.clearVanillaBlockSettings()`
+- `event.clearVanillaEntitySettings()`
 
-它们只会重置各自对象类型的 requirement 数据，不会清掉 XP 奖励、perk、salvage 或 vein 数据。
+这些只重置各自对象类型的需求数据。它们不触及 XP 奖励、加成、效果、回收或矿脉数据。需要完整重置时请使用通用配置。
 
-## 通用配置故意不覆盖的范围
+## 通用配置不覆盖的内容
 
-biome 与 dimension 设置没有提供“一键清空全部默认值”的开关。
+生物群系和维度的设置没有批量禁用开关。这是有意为之 —— 位置数据通常需要整合包作者的显式控制。
 
-这是有意为之。location 数据通常更适合由整合包作者显式列出目标，而不是整表盲清。
-
-需要处理 location 时，请使用 `event.biome(...)`、`event.biomes(...)`、`event.dimension(...)` 或 `event.dimensions(...)` 进行精确覆盖。
+对于位置覆盖，使用定向调用：`event.biome(id, ...)`、`event.biomes(ids, ...)`、`event.dimension(id, ...)`、`event.dimensions(ids, ...)`。
 
 ## 相关页面
 

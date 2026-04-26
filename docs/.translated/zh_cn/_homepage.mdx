@@ -1,12 +1,39 @@
-# PmmoJS 文档首页
+# PmmoJS 文档
 
-`PmmoJS` 用来在 Forge `1.20.1` 上连接 Project MMO 与 KubeJS。
+PmmoJS 连接 Project MMO 与 KubeJS，适配 Forge 1.20.1。
 
-建议从这些页面开始：
+通过 PmmoJS，你可以直接用 KubeJS 脚本操控 PMMO 的游戏机制 —— 技能、经验、需求、Perk、触发器 —— 完全不碰 Java 代码。
 
-- [概览](./overview) 了解功能范围与脚本绑定
-- [启动事件](./startupevents/registry) 查看 predicate、perk 注册与直接 PMMO 注册
-- [服务端事件](./serverevents/settings) 查看 PMMO 设置、配置修改、运行时桥接与内部钩子
-- [标签模型](./tag-model) 理解 perk 标签、运行时上下文标签与配置标签生命周期
+## 从哪开始
 
-如果你想先清掉一部分 PMMO 默认数据，再只加回自己需要的内容，请看 [清空默认数据](./serverevents/reset-recipes) 以及 Forge 通用配置文件 `config/pmmojs-common.toml`。
+如果你是第一次接触 PmmoJS，建议按顺序阅读：
+
+1. **[概览](./overview)** —— PmmoJS 提供了哪些功能，它们如何配合
+2. **[起步 Perk 注册](./startupevents/perks)** —— 创建带条件判断、生命周期回调和状态显示的自定义 Perk
+3. **[PMMO 设置](./serverevents/settings)** —— 配置物品、方块、实体的使用需求、经验奖励和加成
+4. **[运行时事件](./serverevents/normal)** —— 在实际游戏中挂接 PMMO 的触发器
+
+## 快速查阅
+
+- **[配置事件](./serverevents/config)** —— 技能、Perk、服务器参数、自动赋值、反作弊
+- **[内部钩子](./serverevents/internal)** —— 拦截 PMMO 处理器级别逻辑（登录、跨维度、爆炸、酿造）
+- **[重置默认设置](./serverevents/reset-recipes)** —— 通过 `config/pmmojs-common.toml` 从干净基线开始
+- **[Tag 模型](./tag-model)** —— Perk、触发器和内部钩子中的 Tag 如何工作
+
+## 脚本类型速览
+
+| 脚本文件夹 | 应该放什么 |
+|---|---|
+| `startup_scripts/` | Perk 注册、谓词、直接 PMMO 数据注册、Forge 事件监听器 |
+| `server_scripts/` | 运行时触发器、配置编辑、游戏钩子、ProbeJS 文档生成 |
+| `client_scripts/` | 只读技能显示辅助、客户端 UI 逻辑 |
+
+## 从干净基线开始
+
+如果你想把 PMMO 的默认数据全部替换成自定义规则：
+
+1. 在 `config/pmmojs-common.toml` 中启对应的清除开关
+2. 通过 `server_scripts/` 注册你的自定义数据
+3. 只有你在脚本中定义的数据会保留
+
+详见 **[重置默认设置](./serverevents/reset-recipes)**。

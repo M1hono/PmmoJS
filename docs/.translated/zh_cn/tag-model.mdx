@@ -1,231 +1,80 @@
 ---
-title: 标签模型
+title: Tag 模型
 hide_meta: true
 ---
 
-# 标签模型
+# Tag 模型
 
-PmmoJS 在多个系统里都会用到标签，但它们并不表示同一种东西。
+PmmoJS 在多个不同的地方使用 NBT tag。光看 Perk 系统，你就能在至少四种不同的场景中见到 tag。这一页解释每种 tag 是干什么的，以及什么时候该用哪一种。
 
-这一页按用途、生命周期和 API 形式拆开说明。
+## 一句话总结
 
-## 使用标签的系统
+PmmoJS 中的 tag 分为两大类：
 
-| 系统 | API 入口 | 标签类型 | 用途 |
-| --- | --- | --- | --- |
-| 启动阶段 perk 注册 | `PmmoJS.registerPerk(...)` | `PerkTagJS`，底层是 `CompoundTag` | 默认设置、合并设置、`start()` 输出 |
-| 运行期 trigger 钩子 | `PmmoJS.trigger(...)` | 带 helper 的可变 `CompoundTag` context | 单次运行期 trigger 分发上下文 |
-| 运行期 internal 钩子 | `PmmoJS.internal(...)` | 带 helper 的可变 `CompoundTag` context | 单次 internal handler 分发上下文 |
-| XP 事件 | `PmmoJS.xp(...)` | 原始 `CompoundTag` | PMMO XP 事件上下文 |
-| 直接 PMMO trigger listener | `PmmoHelper.registerTriggerListener(...)` | 原始 `CompoundTag` | 直接 PMMO listener 上下文 |
-| Perk 配置编辑 | `PmmoJS.perksConfig(...)` | 静态 `CompoundTag` 条目 | 持久化到 `PerksConfig.PERK_SETTINGS` 的 perk 配置数据 |
+- **静态 tag** 定义数据，在游戏会话之间持久存在。例如：Perk 启动默认值、Perk 配置条目。
+- **运行时 tag** 承载单次执行路径的实时状态，执行路径结束后就消失。例如：触发器上下文、内部钩子上下文、Perk 执行设置。
 
-## 静态标签与运行期标签
+最重要的规则：当 tag 需要供后续生命周期阶段（如 `tick()` 或 `stop()`）使用时，写入 `ctx.getSettings()`。当 tag 只在当前执行趟次中有意义时，写入 `ctx.getResult()`。
 
-最重要的区分是：这个标签到底是静态配置数据，还是运行期执行状态。
+## Tag 出现的场景
 
-静态标签：
+| 系统 | API | Tag 类型 | 生存期 |
+|---|---|---|---|
+| 启动 Perk 注册 | `PmmoJS.registerPerk(...)` | `PerkTagJS`（封装 `CompoundTag`） | 静态 —— 成为 Perk 的默认设置 |
+| Perk 执行回调 | `ctx.getSettings()`、`ctx.getResult()` | `PerkTagJS` | 运行时 —— 每次 Perk 执行时全新构建 |
+| 触发器钩子 | `PmmoJS.trigger(...)` | 可变 `CompoundTag` 上下文 | 运行时 —— 一次触发器调度 |
+| 内部钩子 | `PmmoJS.internal(...)` | 可变 `CompoundTag` 上下文 | 运行时 —— 一次内部处理器调度 |
+| XP 事件 | `PmmoJS.xp(...)` | 原始 `CompoundTag` | 运行时 —— 一次 XP 事件 |
+| Perk 配置编辑 | `PmmoJS.perksConfig(...)` | 静态 `CompoundTag` 条目 | 静态 —— 存储在 PMMO 的配置中 |
+| 直接触发器监听器 | `PmmoHelper.registerTriggerListener(...)` | 原始 `CompoundTag` | 运行时 —— 一次监听器调用 |
 
-- `PmmoJS.registerPerk(...)` 注册的 startup 默认值
-- `PmmoJS.perksConfig(...)` 构建的 perk 配置条目
+## Perk tag 详解
 
-运行期标签：
+当你用 `PmmoJS.registerPerk(...)` 注册 Perk 时，`withSkill(...)`、`withCooldown(...)`、`withInt(...)` 等构建器方法会把值写入**启动默认 tag**。这个 tag 定义了 Perk 的初始配置。
 
-- perk 执行时的 settings/source tag
-- perk `start()` 的 result tag
-- trigger 事件 context
-- internal hook context
-- XP 事件 context
+在运行时，PMMO 会为每次 Perk 执行构建一个**合并后的设置 tag**，按以下顺序组合数据来源：
 
-静态标签负责定义数据。运行期标签负责承载一次实际执行路径中的状态。
+1. 你在 `registerPerk` 中设置的启动默认值
+2. `perks.toml` 中匹配的条目（如果有的话）
+3. 当前 PMMO 事件传入的数据
+4. 同一执行趟次中更早 Perk 的输出
 
-## 启动阶段 Perk 标签
+如果合并后的 tag 中包含 `skill` 字段，PMMO 还会把玩家当前在该技能上的等级作为 `level` 字段注入。
 
-启动阶段 perk 注册里有三个相关但不同的标签概念：
+这个合并后的 tag 就是你在 Perk 回调中通过 `ctx.getSettings()` 访问的内容。
 
-1. startup 默认值
-2. 合并后的 settings/source tag
-3. `start()` result 输出 tag
+### 各回调能做什么
 
-### Startup 默认值
+| 回调 | 通常读取的内容 | 通常写入的内容 |
+|---|---|---|
+| `conditions(ctx)` | `ctx.getSettings()` | 返回 `true` 或 `false` |
+| `start(ctx)` | `ctx.getSettings()` | 持久状态写入 `ctx.getSettings()`，一次性输出写入 `ctx.getResult()` |
+| `tick(ctx)` | `ctx.getSettings()`、`ctx.getElapsedTicks()` | 通常写入 `ctx.getSettings()` 存放私有生命周期状态 |
+| `stop(ctx)` | `ctx.getSettings()` | 清理逻辑写入 `ctx.getSettings()` |
+| `status(ctx)` | `ctx.getSettings()` | 通过 `addLine(...)` 或 `addLines(...)` 输出 UI 文本行 |
 
-在 `PmmoJS.registerPerk(...)` 中定义，入口包括：
+只有 `start()` 能访问 `ctx.getResult()`。PMMO 会把你写入其中的内容合并回当前 Perk 执行中，供其他 Perk 读取。PMMO 会忽略 `tick()` 和 `stop()` 的返回值。
 
-- `withSkill`
-- `withCooldown`
-- `withDuration`
-- `withChance`
-- `withMinLevel`
-- `withMaxLevel`
-- `withPerXLevel`
-- `withMilestones`
-- `withString`
-- `withBool`
-- `withInt`
-- `withLong`
-- `withFloat`
-- `withDouble`
-- `withStringList`
-- `withNumberList`
-- `withCompound`
-- `defaults(tag => {})`
+## PerkTagJS 参考
 
-这些值会组成 perk 的默认属性标签。
+`PerkTagJS` 是启动 Perk 中使用的 tag 封装，提供带类型的 get/set 方法，无需直接操作原始 NBT。
 
-### 合并后的 Settings/Source Tag
+### 读取值
 
-在 PMMO 调用 perk 之前，会按这个顺序构建一份合并后的 settings/source tag：
-
-1. startup 默认值
-2. 命中的 `perks.toml` 配置项
-3. 当前 PMMO 执行路径传入的数据
-4. 同一轮 perk 执行中，前面 perk 已经产出的输出
-
-如果合并结果里存在 `skill`，PMMO 还会根据当前玩家写入解析后的 `level` 字段。
-
-这份合并后的 tag 在回调里通过 `ctx.getSettings()` 访问。
-
-### `start()` Result Tag
-
-只有 `start()` 会拿到第二份标签，通过 `ctx.getResult()` 访问。
-
-它用于承载 `start()` 的即时输出。PMMO 会把它合并回当前这次 perk 执行流程。
-
-`tick()` 与 `stop()` 没有 result tag，PMMO 也不会处理它们的返回值。
-
-## 启动阶段 Perk 标签生命周期
-
-### `conditions(ctx)`
-
-- 从 `ctx.getSettings()` 读取数据
-- 运行在 PMMO 内置 `Perk.VALID_CONTEXT` 之后
-
-### `start(ctx)`
-
-- 可以读取并修改 `ctx.getSettings()`
-- 通过 `ctx.getResult()` 写入即时输出
-- 写入 `ctx.getResult()` 的数据会被合并到当前 perk 执行流程
-- 写入 `ctx.getSettings()` 的数据会进入后续 `tick()` 与 `stop()` 使用的 source tag
-
-### `tick(ctx)`
-
-- 读取并可修改 `ctx.getSettings()`
-- 通过 `ctx.getElapsedTicks()` 获得已过去 tick 数
-- 不会通过 result tag 向 PMMO 输出数据
-
-### `stop(ctx)`
-
-- 读取并可修改 `ctx.getSettings()`
-- 不会通过 result tag 向 PMMO 输出数据
-
-### `status(ctx)`
-
-- 读取 `ctx.getSettings()`
-- 通过 `addLine(...)` 与 `addLines(...)` 构建界面状态文本
-
-## 完整的启动阶段 Perk 示例
-
-如果你想把生命周期函数和它们接触的标签对应起来，直接看这个例子：
-
-```js
-PmmoJS.registerPerk(event => {
-  event
-    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
-    .withSkill('combat')
-    .withMinLevel(10)
-    .withDuration(100)
-    .withInt('heal_interval', 20)
-    .withDouble('heal_amount', 1.0)
-    .defaults(tag => {
-      tag.putBoolean('active', false)
-      tag.putLong('started_at', 0)
-    })
-    .conditions(ctx => {
-      return ctx.getPlayer().getHealth() < ctx.getPlayer().getMaxHealth()
-    })
-    .start(ctx => {
-      const settings = ctx.getSettings()
-      settings.putBoolean('active', true)
-      settings.putLong('started_at', ctx.getPlayer().level().getGameTime())
-      ctx.getResult().putString('steady_mind_started', ctx.getPerkId())
-    })
-    .tick(ctx => {
-      const settings = ctx.getSettings()
-      const interval = settings.getIntOr('heal_interval', 20)
-      const amount = settings.getDoubleOr('heal_amount', 1.0)
-
-      if (settings.getBooleanOr('active', false) && ctx.getElapsedTicks() % interval === 0) {
-        ctx.getPlayer().heal(amount)
-      }
-    })
-    .stop(ctx => {
-      ctx.getSettings().putBoolean('active', false)
-    })
-    .status(ctx => {
-      const settings = ctx.getSettings()
-      ctx.clearLines()
-      ctx.addLine(`active: ${settings.getBooleanOr('active', false)}`)
-      ctx.addLine(`started_at: ${settings.getLongOr('started_at', 0)}`)
-    })
-    .register()
-})
-```
-
-把这个 perk 拆成生命周期来看：
-
-| 阶段 | 标签接口 | 它在做什么 |
-| --- | --- | --- |
-| builder 初始化 | startup 默认 tag | 定义 `skill`、`heal_interval`、`heal_amount`、`active`、`started_at` |
-| `conditions(ctx)` | `ctx.getSettings()` | 读取合并后的 settings/source tag，并返回布尔值 |
-| `start(ctx)` | `ctx.getSettings()` 与 `ctx.getResult()` | 把持久状态写进 settings，把一次性输出写进 result |
-| `tick(ctx)` | `ctx.getSettings()` | 继续读取同一份持久状态，并结合 `ctx.getElapsedTicks()` 运行 |
-| `stop(ctx)` | `ctx.getSettings()` | 清理同一份持久状态 |
-| `status(ctx)` | `ctx.getSettings()` | 用同一份持久状态生成 UI 文本 |
-
-`start(ctx)` 之后的标签快照：
-
-```js
-ctx.getSettings() = {
-  skill: 'combat',
-  level: 18,
-  min_level: 10,
-  duration: 100,
-  heal_interval: 20,
-  heal_amount: 1.0,
-  active: true,
-  started_at: 123456
-}
-
-ctx.getResult() = {
-  steady_mind_started: 'kubejs:steady_mind'
-}
-```
-
-关键规则就是：
-
-- 后续回调还要继续读取的值，写进 `ctx.getSettings()`
-- 只给当前这次 PMMO 执行流程使用的值，写进 `ctx.getResult()`
-
-## `PerkTagJS`
-
-`PerkTagJS` 是启动阶段 perk 注册专用的标签包装层。
-
-读取 helper：
-
-- `keys()`
-- `has(key)`
+- `keys()` —— 列出所有键
+- `has(key)` —— 检查键是否存在
 - `getString(key)`、`getStringOr(key, fallback)`
 - `getInt(key)`、`getIntOr(key, fallback)`
 - `getLong(key)`、`getLongOr(key, fallback)`
 - `getFloat(key)`、`getFloatOr(key, fallback)`
 - `getDouble(key)`、`getDoubleOr(key, fallback)`
 - `getBoolean(key)`、`getBooleanOr(key, fallback)`
-- `getOrCreateCompound(key)`
+- `getOrCreateCompound(key)` —— 获取或创建嵌套的 compound
 
-写入 helper：
+### 写入值
 
-- `remove(key)`
-- `clear()`
+- `remove(key)` —— 删除键
+- `clear()` —— 删除全部
 - `putString(key, value)`
 - `putBoolean(key, value)`
 - `putInt(key, value)`
@@ -234,231 +83,53 @@ ctx.getResult() = {
 - `putDouble(key, value)`
 - `putCompound(key, value)`
 - `putStringList(key, values)`
-- `putNumberList(key, values)`
-- `merge(value)`
+- `putNumberList(key, values)` —— 将值存储为 double
+- `merge(value)` —— 将另一个 compound 的键合并到当前 compound
 
-与 PMMO 直接相关的 helper：
+### PMMO 专用辅助方法
 
-- `getSkill()`
-- `getResolvedLevel()`
-- `getCooldown()`
-- `getDuration()`
-- `getChance()`
+- `getSkill()` —— 此 Perk 关联的技能名称
+- `getResolvedLevel()` —— 玩家当前在该技能上的等级
+- `getCooldown()` —— Perk 的冷却时间（tick）
+- `getDuration()` —— Perk 的持续时间（tick）
+- `getChance()` —— Perk 的激活概率（0.0 到 1.0）
 
-## Trigger Context 标签
+## 触发器上下文 tag
 
-`PmmoJS.trigger(...)` 包装的是 PMMO trigger registry 的运行期执行。
+`PmmoJS.trigger(...)` 通过事件对象给你一个可变的 `CompoundTag`。生命周期很简单：
 
-trigger context 是当前这次运行期分发共用的一份可变 `CompoundTag`。
+1. PMMO 准备一个触发器上下文 tag
+2. 你的 KubeJS 脚本读取并修改这个 tag
+3. 你的脚本返回后，修改后的 tag 回到 PMMO
+4. PMMO 可以继续使用这个 tag，包括将其传入 Perk 执行
 
-生命周期：
+推荐使用事件对象的 `getContext*` / `putContext*` 辅助方法，而不是直接编辑原始 tag。
 
-1. PMMO 把当前 trigger context 传入 trigger bridge。
-2. `PMMOTriggerEventJS` 包装同一份 tag。
-3. 脚本修改的就是这同一份 tag。
-4. 脚本返回后，修改后的 tag 会回到 PMMO。
-5. PMMO 可以继续使用这份 tag，包括后续消费 trigger 输出的 perk 执行流程。
+XP 奖励辅助方法同样可用：`getXpAwards()`、`setXpAwards(map)`、`setXpAward(skill, amount)`、`addXpAward(skill, amount)`、`clearXpAwards()`。
 
-`PMMOTriggerEventJS` 推荐使用的方法：
+要取消 PMMO 对本次触发器的处理，调用 `event.setCancelled(true)`。
 
-- `getContextKeys()`
-- `hasContextKey(key)`
-- `removeContextKey(key)`
-- `getContextBoolean(key)`
-- `getContextString(key)`
-- `getContextInt(key)`
-- `getContextLong(key)`
-- `getContextDouble(key)`
-- `getContextCompound(key)`
-- `putContextBoolean(key, value)`
-- `putContextString(key, value)`
-- `putContextInt(key, value)`
-- `putContextLong(key, value)`
-- `putContextDouble(key, value)`
-- `putContextCompound(key, value)`
+## 内部钩子上下文 tag
 
-XP 奖励 helper：
+`PmmoJS.internal(...)` 的工作方式与触发器类似，但初始时只有一个新的空 `CompoundTag`。在脚本运行之前，桥接层可能会向该 tag 注入钩子专属的数据。
 
-- `getXpAwards()`
-- `setXpAwards(map)`
-- `setXpAward(skill, amount)`
-- `addXpAward(skill, amount)`
-- `clearXpAwards()`
+与触发器的主要区别：
 
-取消逻辑：
+- 内部钩子以空 tag 开始（触发器接收 PMMO 准备好的上下文）
+- 内部钩子有行动控制方法：`event.skipPmmo()`（跳过 PMMO 的处理器）、`event.deny()`（取消 Forge 动作并跳过 PMMO）
+- 部分钩子会收到桥接层注入的键：`EXPLOSION` 获得 `affectedBlockCount` 和 `affectedEntityCount`，`POTION_BREW` 获得 `alreadyTracked` 和 `markBrewed`
 
-- `setCancelled(true)` 会把 PMMO 的内部取消标记写入 trigger context
+## 最佳实践
 
-如果要修改 XP 奖励，请优先用这些 helper，不要直接手写 PMMO 的序列化奖励 key。
-
-## Internal Hook Context 标签
-
-`PmmoJS.internal(...)` 在每次 internal handler 分发时都会创建一份可变 context tag。
-
-生命周期：
-
-1. `PMMOInternalEventJS` 从一个新的空 `CompoundTag` 开始。
-2. bridge 会在脚本运行前，按 hook 类型写入一些初始数据。
-3. 脚本修改同一份 tag。
-4. 脚本返回后，bridge 再读取修改后的 tag，并据此决定是否跳过 PMMO、取消 Forge 动作、发放 XP，或者处理酿造标记。
-
-`PMMOInternalEventJS` 推荐使用的方法：
-
-- `getContextKeys()`
-- `hasContextKey(key)`
-- `removeContextKey(key)`
-- `getContextBoolean(key)`
-- `getContextString(key)`
-- `getContextInt(key)`
-- `getContextLong(key)`
-- `getContextDouble(key)`
-- `getContextCompound(key)`
-- `putContextBoolean(key, value)`
-- `putContextString(key, value)`
-- `putContextInt(key, value)`
-- `putContextLong(key, value)`
-- `putContextDouble(key, value)`
-- `putContextCompound(key, value)`
-
-XP 奖励 helper：
-
-- `getXpAwards()`
-- `setXpAwards(map)`
-- `setXpAward(skill, amount)`
-- `addXpAward(skill, amount)`
-- `clearXpAwards()`
-
-动作控制不只是 context tag 的问题，应使用专门方法：
-
-- `skipPmmo()`
-- `setSkipPmmo(true)`
-- `deny()`
-- `setActionCancelled(true)`
-
-### Bridge 预写入的 Internal Key
-
-当前 bridge 会预先写入这些 key：
-
-| Internal Hook | 初始 Key |
-| --- | --- |
-| `EXPLOSION` | `affectedBlockCount`、`affectedEntityCount` |
-| `POTION_BREW` | `alreadyTracked`、`markBrewed`，以及 helper surface 中的 XP 奖励数据 |
-| 其他 internal hook | 默认不预写入 context key |
-
-## XP 事件 Context 标签
-
-`PmmoJS.xp(...)` 暴露的是 PMMO 的 `XpEvent`。
-
-`event.getContext()` 返回 PMMO XP 事件对象中持有的原始 `CompoundTag`。
-
-特征：
-
-- 没有 PmmoJS 包装层
-- 没有专门的 `getContext*` / `putContext*` helper
-- 返回的是原始 `CompoundTag` 引用，因此它是可变的
-
-当你需要直接面对 PMMO XP context 对象时，就使用这个接口。
-
-## 直接 PMMO Trigger Listener 标签
-
-`PmmoHelper.registerTriggerListener(listenerId, type, listener)` 是 PmmoJS 暴露的最低层标签接口之一。
-
-listener 形态：
-
-```js
-PmmoHelper.registerTriggerListener('kubejs:example', EventType.BLOCK_BREAK, (forgeEvent, context) => {
-  context.putInt('example_value', 1)
-  return context
-})
-```
-
-特征：
-
-- `context` 是原始 PMMO `CompoundTag`
-- listener 必须返回 `CompoundTag`
-- 这个接口比 `PmmoJS.trigger(...)` 更接近 PMMO 原生 listener 注册语义
-
-当你需要直接 PMMO listener 语义，而不是 PmmoJS 事件包装层时，使用它。
-
-## Perk 配置标签
-
-`PmmoJS.perksConfig(...)` 使用的是静态 `CompoundTag` 条目，不是运行期 event context tag。
-
-这些标签会存储在 `PerksConfig.PERK_SETTINGS` 中，并按 `EventType` 分组。
-
-生命周期：
-
-1. `PerkBuilder` 创建一个新的 `CompoundTag`
-2. 必填字段如 `perk` 与 `skill` 会先写入该 tag
-3. 其他 builder 方法再继续写入字段
-4. `build()` 把这个 tag 加入当前事件类型的列表
-5. 配置更新时，`DataManager.updatePerksConfig()` 会把清除、移除和新增结果合并回 PMMO 的 perk 设置映射
-
-这些标签描述的是 perk 配置数据，不是运行期 `ctx.getSettings()` 那一份对象。
-
-## 如何选择正确的标签接口
-
-应使用：
-
-- `PerkTagJS` 处理启动阶段 perk 生命周期数据
-- `PMMOTriggerEventJS` 的 context helper 处理 trigger 运行期状态
-- `PMMOInternalEventJS` 的 context helper 处理 internal hook 运行期状态
-- 原始 `CompoundTag` 只在 API 明确暴露原始 PMMO 对象时使用，例如 `PmmoJS.xp(...)` 或 `PmmoHelper.registerTriggerListener(...)`
-
-## 示例
-
-### 启动阶段 Perk：Settings 与 Result
-
-```js
-PmmoJS.registerPerk(event => {
-  event
-    .create('kubejs:steady_mind', PMMOPerkSide.SERVER)
-    .withSkill('combat')
-    .start(ctx => {
-      ctx.getSettings().putBoolean('active', true)
-      ctx.getResult().putString('startedBy', ctx.getPerkId())
-    })
-    .tick(ctx => {
-      if (ctx.getSettings().getBooleanOr('active', false)) {
-        ctx.getPlayer().heal(1)
-      }
-    })
-    .register()
-})
-```
-
-### Trigger Context
-
-```js
-PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
-  event.putContextInt('bonus_roll', 1)
-  event.addXpAward('mining', 10)
-})
-```
-
-### Internal Hook Context
-
-```js
-PmmoJS.internal(PMMOInternalType.EXPLOSION, event => {
-  if (event.getContextInt('affectedBlockCount') > 64) {
-    event.setSkipPmmo(true)
-  }
-})
-```
-
-### 原始 XP Context
-
-```js
-PmmoJS.xp(event => {
-  const ctx = event.getContext()
-  ctx.putString('source', 'kubejs')
-})
-```
+- 在 Perk 回调内使用 `PerkTagJS` 方法（如 `getIntOr`、`putBoolean`），而不是直接调用原始 NBT。
+- 使用 `ctx.getSettings()` 存放后续回调需要的状态。
+- 只在 `start()` 中使用 `ctx.getResult()` 存放应流入当前 PMMO 执行趟次的输出。
+- 对于触发器和内部钩子的上下文，使用事件对象上的 `getContext*` / `putContext*` 辅助方法。
+- 只有在 API 明确暴露原始 `CompoundTag` 时才直接使用它（例如 `PmmoJS.xp(...)` 或 `PmmoHelper.registerTriggerListener(...)`）。
 
 ## 相关页面
 
-- [启动阶段 Perk 注册](./startupevents/perks)
-- [自定义 Perk 标签](./startupevents/custom-perk-tags)
+- [启动 Perk 注册](./startupevents/perks)
+- [自定义 Perk Tag](./startupevents/custom-perk-tags)
 - [运行时事件](./serverevents/normal)
 - [内部钩子](./serverevents/internal)
-- [配置事件](./serverevents/config)

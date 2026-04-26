@@ -5,25 +5,13 @@ hide_meta: true
 
 # 运行时事件
 
-这些事件会在游戏进行过程中触发，应写在 `server_scripts/` 中。
+运行时事件在游戏过程中触发。放在 `server_scripts/` 中。
 
 ## `PmmoJS.trigger`
 
-这个事件桥接了 PMMO 内部的 `EventTriggerRegistry`。只要 Project MMO 某个处理器实际执行了对应 `EventType` 的 trigger listener，KubeJS 就能通过这里接到回调。
+这是 PmmoJS 中覆盖面最广的钩子。每当 PMMO 内部的 `EventTriggerRegistry` 激活时触发，覆盖了 PMMO 的大部分游戏事件：破坏方块、合成物品、造成伤害、跳跃、游泳、驯服等等。
 
-它的意义是：不再需要为每个 PMMO 处理器单独做一层 KubeJS 包装，你可以统一通过 `PmmoJS.trigger` 监听 `BLOCK_BREAK`、`CRAFT`、`BLOCK_PLACE`、`DEAL_DAMAGE`、`RECEIVE_DAMAGE`、`FISH`、`TAMING`、`SHIELD_BLOCK` 等 PMMO 触发类型。
-
-在 PMMO `1.20.1-1.7.40` 中，当前会经过这层桥接的触发类型包括：
-
-- `ANVIL_REPAIR`、`BLOCK_BREAK`、`BREAK_SPEED`、`BLOCK_PLACE`、`BREED`、`BREW`、`CONSUME`、`CRAFT`
-- `DEAL_DAMAGE`、`RECEIVE_DAMAGE`、`DEATH`、`ENCHANT`、`ENTITY`、`FISH`、`GROW`
-- `HIT_BLOCK`、`ACTIVATE_BLOCK`、`ACTIVATE_ITEM`
-- `JUMP`、`SPRINT_JUMP`、`CROUCH_JUMP`
-- `GIVEN_AS_TRADE`、`RECEIVED_AS_TRADE`、`TAMING`、`SHIELD_BLOCK`
-- `BREATH_CHANGE`、`HEALTH_CHANGE`、`HEALTH_INCREASE`、`HEALTH_DECREASE`
-- `RIDING`、`EFFECT`、`SPRINTING`、`CROUCH`、`SUBMERGED`、`SWIMMING`、`DIVING`、`SURFACING`、`SWIM_SPRINTING`
-
-这并不代表 PMMO 的每条运行时逻辑都属于 trigger registry。像维度切换、登录、坐骑、活塞、玩家死亡、爆炸、睡眠等处理器并不是 `EventType` trigger 路径，它们现在通过 `PmmoJS.internal` 单独暴露。
+可以把它理解为"从 KubeJS 监听 PMMO 的内置事件系统"。
 
 ```js
 PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
@@ -39,24 +27,32 @@ PmmoJS.trigger(EventType.BLOCK_BREAK, event => {
 })
 ```
 
-`PMMOTriggerEventJS` 上常用的方法：
+### PMMO 1.7.40 覆盖的触发器类型
 
-- `getType()`、`getTypeId()`
-- `getForgeEvent()`、`getForgeEventClassName()`
-- `hasPlayer()`、`getPlayer()`、`getServerPlayer()`
-- `getContext()` 以及 `getContextBoolean`、`getContextString`、`putContextInt`、`putContextCompound`
-- `getXpAwards()`、`setXpAwards()`、`setXpAward()`、`addXpAward()`
-- `setCancelled(true)`，它会把 PMMO 内部使用的 `is_cancelled` 标记写回上下文
+- **交互：** `BLOCK_BREAK`、`BLOCK_PLACE`、`HIT_BLOCK`、`ACTIVATE_BLOCK`、`ACTIVATE_ITEM`、`CRAFT`、`BREW`、`CONSUME`
+- **战斗：** `DEAL_DAMAGE`、`RECEIVE_DAMAGE`、`DEATH`、`SHIELD_BLOCK`
+- **实体：** `BREED`、`TAMING`、`ENTITY`、`GIVEN_AS_TRADE`、`RECEIVED_AS_TRADE`
+- **工具：** `ANVIL_REPAIR`、`ENCHANT`、`FISH`、`GROW`、`BREAK_SPEED`
+- **移动：** `JUMP`、`SPRINT_JUMP`、`CROUCH_JUMP`、`RIDING`、`SPRINTING`、`CROUCH`、`SUBMERGED`、`SWIMMING`、`DIVING`、`SURFACING`、`SWIM_SPRINTING`
+- **状态：** `BREATH_CHANGE`、`HEALTH_CHANGE`、`HEALTH_INCREASE`、`HEALTH_DECREASE`、`EFFECT`
 
-<Callout variant="info">
-    `PmmoJS.trigger` 适合处理 PMMO 的 `EventType` 运行时逻辑。
-    如果你要控制的是没有经过 trigger registry 的 PMMO 处理器，请使用
-    [`PmmoJS.internal`](./internal.mdx)。
-</Callout>
+部分 PMMO 处理器（跨维度、登录、骑乘、活塞、爆炸、玩家死亡、睡觉、药水酿造）不经过触发器注册表，请使用 `PmmoJS.internal`。
+
+### 触发器事件的关键方法
+
+- `getType()` 和 `getTypeId()` —— 触发的是哪种触发器类型
+- `getForgeEvent()` 和 `getForgeEventClassName()` —— 底层的 Forge 事件（如果有的话）
+- `hasPlayer()`、`getPlayer()`、`getServerPlayer()` —— 涉及的玩家
+- `getContextBoolean(key)`、`getContextString(key)`、`getContextInt(key)`、`getContextLong(key)`、`getContextDouble(key)` —— 读取上下文值
+- `putContextBoolean(key, value)`、`putContextString(key, value)` 等 —— 写入上下文值
+- `hasContextKey(key)`、`removeContextKey(key)`、`getContextKeys()` —— 管理上下文键
+- `addXpAward(skill, amount)` —— 添加 XP 奖励
+- `setXpAwards(map)`、`getXpAwards()`、`clearXpAwards()` —— 管理所有 XP 奖励
+- `setCancelled(true)` —— 告诉 PMMO 跳过处理此触发器
 
 ## `PmmoJS.xp`
 
-当 PMMO 为玩家某个技能增减 XP 时触发。
+当 PMMO 改变玩家的 XP 时触发。
 
 ```js
 PmmoJS.xp(event => {
@@ -75,7 +71,7 @@ PmmoJS.xp(event => {
 
 ## `PmmoJS.enchant`
 
-玩家进行附魔时触发。
+当玩家附魔物品时触发。
 
 ```js
 PmmoJS.enchant(event => {
@@ -86,7 +82,7 @@ PmmoJS.enchant(event => {
 
 ## `PmmoJS.furnace`
 
-PMMO 熔炉相关逻辑触发时执行。
+由 PMMO 的熔炉烧炼事件触发。
 
 ```js
 PmmoJS.furnace(event => {
@@ -99,7 +95,7 @@ PmmoJS.furnace(event => {
 
 ## `PmmoJS.salvage`
 
-玩家执行 PMMO 回收时触发。
+当玩家回收物品时触发。
 
 ```js
 PmmoJS.salvage(event => {
@@ -109,12 +105,9 @@ PmmoJS.salvage(event => {
 })
 ```
 
-## 伤害惩罚事件
+## 伤害惩罚钩子
 
-- `PmmoJS.itemstackDamagePenalty`
-- `PmmoJS.entityDamagePenalty`
-
-它们用于修改 PMMO 的需求未达标伤害惩罚，而不只是单纯取消原逻辑。
+使用这些钩子来缩放 PMMO 的伤害惩罚，而不是仅仅取消它。
 
 ```js
 PmmoJS.itemstackDamagePenalty(event => {
@@ -126,9 +119,11 @@ PmmoJS.entityDamagePenalty(event => {
 })
 ```
 
-## `PmmoHelper`
+第一个适用于物品耐久损耗；第二个适用于收到的实体伤害。
 
-`PmmoHelper` 是推荐直接使用的 PMMO 辅助绑定，目的是绕开 KubeJS 对 Java 重载处理较弱的问题。
+## 服务端脚本中的 `PmmoHelper`
+
+`PmmoHelper` 让你直接访问 PMMO 的 API，避免 KubeJS 重载歧义。这对于自定义命令、Forge 事件监听器以及 PmmoJS 事件封装不太适合的场景很有用。
 
 ```js
 ServerEvents.loaded(event => {
@@ -141,16 +136,12 @@ ServerEvents.loaded(event => {
 })
 ```
 
-常用方法分组：
+关键方法组：
 
-- 技能状态：`getSkillLevel`、`setSkillLevel`、`addSkillXp`、`getAllSkillLevels`
-- 数据查询：`getItemXpAwards`、`getBlockRequirements`、`getConsolidatedModifiers`
-- 直接注册：`registerRequirementData`、`registerXpAwardData`、`registerBonusData`、tooltip 注册、predicate 注册
-- 发现辅助：`getTriggerTypeIds`、`getInternalTypeIds`
-- PMMO 系统：`awardXpToPlayer`、`awardXpToPartyInRange`、`getPartyMembers`、`applyVeinMining`、`triggerSalvage`
+- **技能状态：** `getSkillLevel`、`setSkillLevel`、`addSkillXp`、`getAllSkillLevels`
+- **数据查询：** `getItemXpAwards`、`getBlockRequirements`、`getConsolidatedModifiers`
+- **直接注册：** `registerRequirementData`、`registerXpAwardData`、`registerBonusData`、工具提示注册、谓词
+- **发现辅助：** `getTriggerTypeIds`、`getInternalTypeIds`
+- **PMMO 系统：** `awardXpToPlayer`、`awardXpToPartyInRange`、`getPartyMembers`、`applyVeinMining`、`triggerSalvage`
 
-<Callout variant="info">
-    `PmmoHelper` 是面向 PMMO 全部常用逻辑的总入口。`SkillHelper` 仍然保留，
-    适合旧脚本或只关心技能等级与 XP 的场景。`client_scripts/` 中不提供
-    `PmmoHelper`。
-</Callout>
+`SkillHelper` 仍然可用于旧脚本，但 `PmmoHelper` 是推荐的前进方向。

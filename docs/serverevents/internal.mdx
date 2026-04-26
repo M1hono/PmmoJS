@@ -5,25 +5,36 @@ hide_meta: true
 
 # Internal Hooks
 
-`PmmoJS.internal` covers PMMO handler paths that do not go through PMMO's `EventTriggerRegistry`.
+`PmmoJS.internal` covers PMMO handler paths that do not go through the trigger registry. Use these hooks when you need to intercept PMMO's built-in handler logic directly.
 
-Use this when you need to intercept Project MMO logic such as login sync, dimension travel checks, mount checks, piston chunk tracking, explosion filtering, player death XP loss, or potion brewing.
+## When to use internal vs trigger
 
-Supported internal hook ids on PMMO `1.20.1-1.7.40`:
+Use `PmmoJS.internal` when the handler you want to hook into is not available through `PmmoJS.trigger`. The general rule:
 
-- `DIMENSION_TRAVEL`
-- `EXPLOSION`
-- `LOGIN`
-- `MOUNT`
-- `PISTON`
-- `PLAYER_DEATH`
-- `POTION_BREW`
-- `SLEEP_FINISHED`
+- **`PmmoJS.trigger`** — PMMO events that route through the `EventTriggerRegistry`. Most gameplay actions live here: breaking blocks, crafting, combat, movement, etc.
+- **`PmmoJS.internal`** — PMMO handler classes that never use the trigger registry. These are specific engine-level paths: login, dimension travel, explosions, pistons, player death, sleep, potion brewing.
 
-`PMMOInternalEventJS` has two separate control paths:
+## Supported internal hooks
 
-- `return false` or `event.skipPmmo()` skips PMMO's built-in handler logic but does not automatically cancel the underlying Forge action.
-- `event.deny()` or `event.setActionCancelled(true)` cancels the wrapped Forge action when that Forge event is cancelable, and also skips PMMO's own handler.
+On PMMO 1.7.40, the following internal hooks are bridged:
+
+| Hook ID | What it intercepts |
+|---|---|
+| `DIMENSION_TRAVEL` | Player changing dimensions |
+| `EXPLOSION` | Explosion events (seeded with affected block/entity counts) |
+| `LOGIN` | Player login and data sync |
+| `MOUNT` | Player mounting an entity |
+| `PISTON` | Piston chunk tracking updates |
+| `PLAYER_DEATH` | Player death XP loss handling |
+| `POTION_BREW` | Potion brewing (also reachable via `EventType.BREW`) |
+| `SLEEP_FINISHED` | Player finishing sleep |
+
+## Two control paths
+
+`PMMOInternalEventJS` gives you two independent ways to control PMMO's behavior:
+
+- **Skip PMMO only:** `event.skipPmmo()` or `event.setSkipPmmo(true)` — PMMO's handler logic is skipped, but the underlying Forge action is not cancelled. Use this when you want PMMO to ignore the event while the rest of the game processes it normally.
+- **Deny the action:** `event.deny()` or `event.setActionCancelled(true)` — Cancels the wrapped Forge action AND skips PMMO's handler. Use this when you want to prevent the action entirely.
 
 ```js
 PmmoJS.internal(PMMOInternalType.DIMENSION_TRAVEL, event => {
@@ -31,16 +42,18 @@ PmmoJS.internal(PMMOInternalType.DIMENSION_TRAVEL, event => {
     if (!player) return
 
     if (player.stages.has('pmmo_bypass_travel')) {
-        event.skipPmmo()
+        event.skipPmmo()  // let the player travel, just don't run PMMO's checks
     }
 
     if (player.stages.has('pmmo_lock_dimensions')) {
-        event.deny()
+        event.deny()  // block the travel entirely
     }
 })
 ```
 
-For potion brewing, `POTION_BREW` gives you the final PMMO XP award map and the tracking flag used by PMMO's brewed-item guard:
+## Potion brewing example
+
+`POTION_BREW` is special: the bridge seeds the context with a tracking flag and lets you control the brewed-item output.
 
 ```js
 PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
@@ -53,30 +66,33 @@ PmmoJS.internal(PMMOInternalType.POTION_BREW, event => {
 })
 ```
 
-Useful members on `PMMOInternalEventJS`:
+## Explosion example
 
-- `getType()` and `getTypeId()`
-- `getForgeEvent()` and `getForgeEventClassName()`
-- `hasPlayer()`, `getPlayer()`, and `getServerPlayer()`
-- `shouldSkipPmmo()`, `setSkipPmmo(true)`, and `skipPmmo()`
-- `canCancelAction()`, `isActionCancelled()`, `setActionCancelled(true)`, and `deny()`
-- `getContext()` plus the `getContext*` and `putContext*` helpers
-- `getXpAwards()`, `setXpAwards()`, `setXpAward()`, and `addXpAward()`
+`EXPLOSION` receives `affectedBlockCount` and `affectedEntityCount` from the bridge:
 
-<Callout variant="info">
-    `POTION_BREW` is also wired into `PmmoJS.trigger(EventType.BREW, ...)` now.
-    Use `PmmoJS.trigger` when you want PMMO `EventType`-style behavior, and use
-    `PmmoJS.internal` when you need the handler-specific control surface.
-</Callout>
+```js
+PmmoJS.internal(PMMOInternalType.EXPLOSION, event => {
+    if (event.getContextInt('affectedBlockCount') > 64) {
+        event.setSkipPmmo(true)
+    }
+})
+```
 
-## ProbeJS
+## Key methods on the internal event
 
-PmmoJS does not need a custom ProbeJS-only Java event.
+- `getType()` and `getTypeId()` — which internal hook fired
+- `getForgeEvent()` and `getForgeEventClassName()` — the underlying Forge event
+- `hasPlayer()`, `getPlayer()`, `getServerPlayer()` — the player, if applicable
+- `shouldSkipPmmo()`, `setSkipPmmo(true)`, `skipPmmo()` — skip PMMO's handler
+- `canCancelAction()`, `isActionCancelled()`, `setActionCancelled(true)`, `deny()` — cancel the Forge action
+- `getContextBoolean(key)`, `getContextString(key)`, etc. — read context values
+- `putContextBoolean(key, value)`, `putContextString(key, value)`, etc. — write context values
+- `getXpAwards()`, `setXpAwards(map)`, `setXpAward(skill, amount)`, `addXpAward(skill, amount)` — XP management
 
-ProbeJS already exposes `ProbeJSEvents.generateDoc`, so the recommended approach is:
+## ProbeJS type completions
 
-- keep strong `@Info` annotations and typed `Extra` metadata in Java
-- add ProbeJS snippets or doc transforms through `ProbeJSEvents.generateDoc`
-- use the shipped dev scripts in `run/kubejs/server_scripts/pmmojs_probe_docs.js` and `run/kubejs/server_scripts/pmmojs_test_runtime.js` as the reference pattern
+PmmoJS ships with ProbeJS support for both the v6 and v7 (Legacy) ProbeJS APIs. Type completions for all enum values, event objects, and utility classes are provided automatically when ProbeJS generates its type definitions.
 
-That keeps ProbeJS support aligned with the rest of KubeJS instead of splitting documentation into a separate custom event system.
+You do not need to write custom ProbeJS event listeners for PmmoJS types — they are registered by the plugin during mod initialization.
+
+For VSCode users, the ProbeJS Legacy plugin also provides code snippets (e.g., type `@pmmo_internal` to get a scaffolded internal handler).

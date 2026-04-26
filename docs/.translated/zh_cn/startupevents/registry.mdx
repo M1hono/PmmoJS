@@ -5,90 +5,96 @@ hide_meta: true
 
 # 启动注册
 
-启动事件用于注册那些必须在运行期玩法逻辑开始前就存在的 PMMO 结构。
+启动事件注册 PMMO 在游戏开始之前需要的结构。这些属于 `startup_scripts/`，不是 `server_scripts/`。
 
-`startup_scripts/` 适合放：
+## 什么放在哪里
 
-- PMMO predicate
-- PMMO perk 类型注册
-- 直接 PMMO 注册数据
-- 启动期原生 Forge 事件监听
+**放在 `startup_scripts/` 中：**
+- `PmmoJS.registerPredicate(...)` —— 自定义需求谓词
+- `PmmoJS.registerPerk(...)` —— 新 Perk 类型定义
+- `PmmoHelper.registerRequirementData(...)` —— 直接 PMMO 数据注册
+- `PmmoHelper.registerXpAwardData(...)` —— 直接 XP 奖励注册
+- `PmmoHelper.registerTriggerListener(...)` —— 直接触发器监听器注册
+- `ForgeEvents.onEvent(...)` —— 原始 Forge 事件监听器
 
-`server_scripts/` 适合放：
-
-- `PmmoJS.trigger(...)`
-- `PmmoJS.internal(...)`
-- PMMO 配置事件
-- 命令逻辑
-- ProbeJS 文档生成
+**放在 `server_scripts/` 中：**
+- `PmmoJS.trigger(...)`、`PmmoJS.internal(...)` —— 运行时钩子
+- 所有配置事件 —— `PmmoJS.skillsConfig(...)`、`PmmoJS.perksConfig(...)` 等
+- `PmmoJS.settings(...)` —— 物品/方块/实体数据
+- `ProbeJSEvents.generateDoc(...)` —— ProbeJS 文档生成
 
 ## `PmmoJS.registerPredicate`
 
-用于注册 PMMO 在需求判定时调用的 predicate。
+注册 PMMO 在需求检查期间评估的自定义谓词。提供三种方法：
 
-可用方法：
+- `registerActionPredicate(resourceId, reqType, predicate)` —— 用于物品操作
+- `registerBreakPredicate(resourceId, reqType, predicate)` —— 用于方块破坏
+- `registerEntityPredicate(resourceId, reqType, predicate)` —— 用于实体交互
 
-- `registerActionPredicate(resourceId, reqType, predicate)`
-- `registerBreakPredicate(resourceId, reqType, predicate)`
-- `registerEntityPredicate(resourceId, reqType, predicate)`
-
-每个 predicate 都会接收当前 `Player` 和对应的目标对象。
+每个谓词接收当前 `Player` 和相关目标对象。
 
 ```js
 PmmoJS.registerPredicate(event => {
-  event.registerActionPredicate(PmmoHelper.id('minecraft:stick'), ReqType.WEAPON, (player, stack) => {
-    return player.experienceLevel >= 5
-  })
+  event.registerActionPredicate(
+    PmmoHelper.id('minecraft:stick'),
+    ReqType.WEAPON,
+    (player, stack) => player.experienceLevel >= 5
+  )
 })
 ```
 
 ## `PmmoJS.registerPerk`
 
-用于在 `startup_scripts/` 中注册新的 PMMO perk 类型。
+定义新的 PMMO Perk 类型。这是用于创建带生命周期回调的自定义 Perk 的重量级 API。
 
-- 这个事件用于定义新的 perk 类型
-- 如果只是修改已有 perk 配置，请使用 `PmmoJS.perksConfig(...)`
-
-参考页面：
-
-- [Perk 注册](./perks)
+参见 [Perk 注册](./perks) 获取完整指南。
 
 ## 直接 PMMO 注册
 
-`PmmoHelper` 可以在 `startup_scripts/` 中直接使用。
+`PmmoHelper` 在 `startup_scripts/` 中可用，用于将数据直接注册进 PMMO 的 API。当你希望精确控制注册内容，而不通过 KubeJS 事件系统时，这很有用。
 
-常用 helper：
-
-- `registerRequirementData`
-- `registerXpAwardData`
-- `registerDamageXpAwardData`
-- `registerBonusData`
-- `registerPositiveEffects`
-- `registerNegativeEffects`
-- `registerSalvageData`
-- `registerVeinData`
-- `registerTriggerListener`
+常用辅助方法：
 
 ```js
-PmmoHelper.registerRequirementData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', ReqType.TOOL, {
-  mining: 10,
-  endurance: 4
-}, true)
+// 注册需求
+PmmoHelper.registerRequirementData(
+  ObjectType.ITEM, 'minecraft:diamond_pickaxe', ReqType.TOOL,
+  { mining: 10, endurance: 4 }, true
+)
 
-PmmoHelper.registerXpAwardData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', EventType.BLOCK_BREAK, {
-  mining: 8
-}, true)
+// 注册 XP 奖励
+PmmoHelper.registerXpAwardData(
+  ObjectType.ITEM, 'minecraft:diamond_pickaxe', EventType.BLOCK_BREAK,
+  { mining: 8 }, true
+)
+
+// 注册触发器监听器
+PmmoHelper.registerTriggerListener('kubejs:example', EventType.BLOCK_BREAK,
+  (forgeEvent, context) => {
+    context.putInt('bonus_roll', 1)
+    return context
+  }
+)
 ```
 
-## 原生 Forge 事件
+最后一个参数（`true`）告诉 PMMO 替换已有数据而不是与它合并。
 
-在核心 KubeJS `1.20.1` 中，`ForgeEvents.onEvent(...)` 属于 startup 脚本 API。
+完整直接注册方法列表：`registerRequirementData`、`registerXpAwardData`、`registerDamageXpAwardData`、`registerBonusData`、`registerPositiveEffects`、`registerNegativeEffects`、`registerSalvageData`、`registerVeinData`、`registerMobModifierData`、`registerTriggerListener`，以及对应的工具提示注册变体。
+
+## 原始 Forge 事件
+
+在 KubeJS 1.20.1 上，`ForgeEvents.onEvent(...)` 是启动脚本 API：
 
 ```js
-ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent', event => {
-  console.info(`[PmmoJS] login forge event for ${event.getEntity().getScoreboardName()}`)
-})
+ForgeEvents.onEvent(
+  'net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent',
+  event => {
+    console.info(`[PmmoJS] ${event.getEntity().getScoreboardName()} 已登录`)
+  }
+)
 ```
+
+注意：`ProbeJSEvents.generateDoc(...)` 是服务端脚本 API，不是启动 API。这两个事件系统尽管看起来相似，但有各自不同的生命周期。
 
 ## 相关页面
 

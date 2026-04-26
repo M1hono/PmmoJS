@@ -5,90 +5,96 @@ hide_meta: true
 
 # Startup Registries
 
-Startup events register PMMO structures that must exist before runtime gameplay logic begins.
+Startup events register structures that PMMO needs before gameplay begins. These belong in `startup_scripts/`, not `server_scripts/`.
 
-Use `startup_scripts/` for:
+## What goes where
 
-- PMMO predicates
-- PMMO perk type registration
-- direct PMMO registry data
-- startup-side raw Forge event listeners
+**Put in `startup_scripts/`:**
+- `PmmoJS.registerPredicate(...)` — custom requirement predicates
+- `PmmoJS.registerPerk(...)` — new perk type definitions
+- `PmmoHelper.registerRequirementData(...)` — direct PMMO data registration
+- `PmmoHelper.registerXpAwardData(...)` — direct XP award registration
+- `PmmoHelper.registerTriggerListener(...)` — direct trigger listener registration
+- `ForgeEvents.onEvent(...)` — raw Forge event listeners
 
-Use `server_scripts/` for:
-
-- `PmmoJS.trigger(...)`
-- `PmmoJS.internal(...)`
-- PMMO config events
-- command logic
-- ProbeJS generation
+**Put in `server_scripts/`:**
+- `PmmoJS.trigger(...)`, `PmmoJS.internal(...)` — runtime hooks
+- All config events — `PmmoJS.skillsConfig(...)`, `PmmoJS.perksConfig(...)`, etc.
+- `PmmoJS.settings(...)` — item/block/entity data
+- `ProbeJSEvents.generateDoc(...)` — ProbeJS documentation generation
 
 ## `PmmoJS.registerPredicate`
 
-Registers requirement predicates that PMMO will evaluate during requirement checks.
+Registers custom predicates that PMMO evaluates during requirement checks. Three methods are available:
 
-Available methods:
-
-- `registerActionPredicate(resourceId, reqType, predicate)`
-- `registerBreakPredicate(resourceId, reqType, predicate)`
-- `registerEntityPredicate(resourceId, reqType, predicate)`
+- `registerActionPredicate(resourceId, reqType, predicate)` — for item actions
+- `registerBreakPredicate(resourceId, reqType, predicate)` — for block breaks
+- `registerEntityPredicate(resourceId, reqType, predicate)` — for entity interactions
 
 Each predicate receives the current `Player` and the relevant target object.
 
 ```js
 PmmoJS.registerPredicate(event => {
-  event.registerActionPredicate(PmmoHelper.id('minecraft:stick'), ReqType.WEAPON, (player, stack) => {
-    return player.experienceLevel >= 5
-  })
+  event.registerActionPredicate(
+    PmmoHelper.id('minecraft:stick'),
+    ReqType.WEAPON,
+    (player, stack) => player.experienceLevel >= 5
+  )
 })
 ```
 
 ## `PmmoJS.registerPerk`
 
-Registers new PMMO perk types from `startup_scripts/`.
+Defines new PMMO perk types. This is the heavyweight API for creating custom perks with lifecycle callbacks.
 
-- Use this event when you are defining a new perk type
-- Use `PmmoJS.perksConfig(...)` when you are editing perk config entries
+See [Perk Registration](./perks) for the full guide.
 
-Reference page:
+## Direct PMMO registration
 
-- [Perk Registration](./perks)
-
-## Direct PMMO Registration
-
-`PmmoHelper` is available in `startup_scripts/` for direct registry registration.
+`PmmoHelper` is available in `startup_scripts/` for registering data directly into PMMO's API. This is useful when you want precise control over what gets registered without going through the KubeJS event system.
 
 Common helpers:
 
-- `registerRequirementData`
-- `registerXpAwardData`
-- `registerDamageXpAwardData`
-- `registerBonusData`
-- `registerPositiveEffects`
-- `registerNegativeEffects`
-- `registerSalvageData`
-- `registerVeinData`
-- `registerTriggerListener`
-
 ```js
-PmmoHelper.registerRequirementData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', ReqType.TOOL, {
-  mining: 10,
-  endurance: 4
-}, true)
+// Register requirements
+PmmoHelper.registerRequirementData(
+  ObjectType.ITEM, 'minecraft:diamond_pickaxe', ReqType.TOOL,
+  { mining: 10, endurance: 4 }, true
+)
 
-PmmoHelper.registerXpAwardData(ObjectType.ITEM, 'minecraft:diamond_pickaxe', EventType.BLOCK_BREAK, {
-  mining: 8
-}, true)
+// Register XP awards
+PmmoHelper.registerXpAwardData(
+  ObjectType.ITEM, 'minecraft:diamond_pickaxe', EventType.BLOCK_BREAK,
+  { mining: 8 }, true
+)
+
+// Register a trigger listener
+PmmoHelper.registerTriggerListener('kubejs:example', EventType.BLOCK_BREAK,
+  (forgeEvent, context) => {
+    context.putInt('bonus_roll', 1)
+    return context
+  }
+)
 ```
 
-## Raw Forge Events
+The last parameter (`true`) tells PMMO to replace existing data rather than merging with it.
 
-On core KubeJS `1.20.1`, `ForgeEvents.onEvent(...)` is a startup-script API.
+Full list of direct registration methods: `registerRequirementData`, `registerXpAwardData`, `registerDamageXpAwardData`, `registerBonusData`, `registerPositiveEffects`, `registerNegativeEffects`, `registerSalvageData`, `registerVeinData`, `registerMobModifierData`, `registerTriggerListener`, plus tooltip registration variants.
+
+## Raw Forge events
+
+On KubeJS for 1.20.1, `ForgeEvents.onEvent(...)` is a startup-script API:
 
 ```js
-ForgeEvents.onEvent('net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent', event => {
-  console.info(`[PmmoJS] login forge event for ${event.getEntity().getScoreboardName()}`)
-})
+ForgeEvents.onEvent(
+  'net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent',
+  event => {
+    console.info(`[PmmoJS] ${event.getEntity().getScoreboardName()} logged in`)
+  }
+)
 ```
+
+Note: `ProbeJSEvents.generateDoc(...)` is a server-script API, not startup. These two event systems have different lifecycles even though they look similar.
 
 ## Related
 

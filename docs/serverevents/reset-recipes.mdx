@@ -5,13 +5,11 @@ hide_meta: true
 
 # Reset Defaults
 
-Use this page when you want PMMO to start from a smaller or fully custom data set.
+When you want to replace PMMO's built-in data with your own custom rules, you need a way to wipe the defaults first. PmmoJS gives you two approaches: a config-based bulk reset, and script-based targeted removal.
 
-The old reset example bundle is no longer part of the published workflow. Use the patterns below in your own `server_scripts/`, or prefer the common config when it already covers your case.
+## Recommended: use the common config
 
-## Preferred Path: Common Config
-
-For the broad categories that PmmoJS can wipe safely, use `config/pmmojs-common.toml`:
+The cleanest way to start from a blank slate is `config/pmmojs-common.toml`:
 
 ```toml
 [disableDefaultSettings]
@@ -24,32 +22,38 @@ itemExtras = false
 blockVeinData = false
 ```
 
-Available switches:
+Each switch controls a category:
 
-- `disableDefaultSettings.all`: enables every supported category below
-- `disableDefaultSettings.skills`: removes PMMO default skills before `PmmoJS.skillsConfig(...)`
-- `disableDefaultSettings.perks`: clears PMMO default perk entries before `PmmoJS.perksConfig(...)`
-- `disableDefaultSettings.requirements`: clears item, block, and entity requirement data before `PmmoJS.settings(...)`
-- `disableDefaultSettings.xpAwards`: clears item, block, and entity XP-award data before `PmmoJS.settings(...)`
-- `disableDefaultSettings.itemExtras`: clears item bonuses, positive effects, negative effects, salvage, and item vein data before `PmmoJS.settings(...)`
-- `disableDefaultSettings.blockVeinData`: clears block vein-mining data before `PmmoJS.settings(...)`
+| Switch | What it clears |
+|---|---|
+| `all` | Everything listed below |
+| `skills` | PMMO default skills |
+| `perks` | PMMO default perk entries |
+| `requirements` | Item, block, and entity requirement data |
+| `xpAwards` | Item, block, and entity XP award data |
+| `itemExtras` | Item bonuses, positive/negative effects, salvage, vein data |
+| `blockVeinData` | Block vein-mining data |
 
-This order matters: the reset happens first, then your KubeJS scripts run. You do not lose the ability to add custom data afterward.
+The order of operations guarantees your scripts win:
 
-## When To Use Scripts Instead
+1. PmmoJS reads the common config
+2. Enabled categories are wiped
+3. Your KubeJS scripts run and apply your custom data
 
-Use KubeJS when you need targeted control rather than a whole-category wipe.
+## When to use scripts instead
 
-Examples:
+Use KubeJS for targeted control when you do not want a whole-category wipe:
 
-- keep PMMO defaults for most systems, but clear one requirement family with `clearVanillaItemSettings()`
-- clear one perk event list with `event.clearPerks(EventType.SKILL_UP)`
-- rebuild only selected items, blocks, or entities after a common-config wipe
-- control biome or dimension settings by explicit id
+- Clear one requirement family: `event.clearVanillaItemSettings()`
+- Clear one perk event list: `event.clearPerks(EventType.SKILL_UP)`
+- Remove a single perk: `event.removePerkType('pmmo:fireworks')`
+- Override specific items after a common config wipe
 
-## Rebuilding Skills After a Reset
+## Rebuilding after a reset
 
-If `disableDefaultSettings.skills = true`, define the skills you actually want:
+### Skills
+
+If you wiped `skills`, define the skills your pack actually uses:
 
 ```js
 PmmoJS.skillsConfig(event => {
@@ -67,9 +71,9 @@ PmmoJS.skillsConfig(event => {
 })
 ```
 
-## Rebuilding Perks After a Reset
+### Perks
 
-If `disableDefaultSettings.perks = true`, add back only the perk entries your pack uses:
+If you wiped `perks`, add back only the entries you need:
 
 ```js
 PmmoJS.perksConfig(event => {
@@ -83,9 +87,9 @@ PmmoJS.perksConfig(event => {
 })
 ```
 
-## Rebuilding Object Settings After a Reset
+### Object settings
 
-If you wipe requirements, XP awards, or item extras, add back only the rules you need:
+If you wiped requirements, XP awards, or item extras:
 
 ```js
 PmmoJS.settings(event => {
@@ -100,23 +104,21 @@ PmmoJS.settings(event => {
 })
 ```
 
-## Legacy Requirement Wipe Helpers
+## Legacy requirement helpers
 
-`PmmoJS.settings(...)` still exposes:
+The settings event also has these helpers, retained for backwards compatibility:
 
-- `clearVanillaItemSettings()`
-- `clearVanillaBlockSettings()`
-- `clearVanillaEntitySettings()`
+- `event.clearVanillaItemSettings()`
+- `event.clearVanillaBlockSettings()`
+- `event.clearVanillaEntitySettings()`
 
-These helpers only reset requirement data for their own object type. They do not wipe XP awards, perk data, salvage, or vein data.
+These only reset requirement data for their object type. They do not touch XP awards, bonuses, effects, salvage, or vein data. Use the common config for complete resets.
 
-## What Is Not Covered By The Common Config
+## What the common config does not cover
 
-Biome and dimension settings do not have a blanket "disable all defaults" switch.
+Biome and dimension settings do not have a blanket disable switch. This is intentional — location data typically needs explicit control from the pack author.
 
-That is intentional. Location data usually needs an explicit list from the pack author instead of a whole-registry wipe.
-
-Use targeted `event.biome(...)`, `event.biomes(...)`, `event.dimension(...)`, or `event.dimensions(...)` calls for location-specific overrides.
+Use targeted calls for location overrides: `event.biome(id, ...)`, `event.biomes(ids, ...)`, `event.dimension(id, ...)`, `event.dimensions(ids, ...)`.
 
 ## Related
 

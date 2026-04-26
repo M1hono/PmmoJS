@@ -3,22 +3,15 @@ title: PMMO Settings
 hide_meta: true
 ---
 
-# PMMO Settings Event
+# PMMO Settings
 
-`PmmoJS.settings` is the main bridge for registering PMMO object data from `server_scripts/`.
+`PmmoJS.settings` is the main way to register PMMO data for items, blocks, entities, biomes, and dimensions from `server_scripts/`.
 
-## Single-target builders
+Think of it as a replacement for editing PMMO's JSON config files by hand. You write JavaScript instead, and the data is applied cleanly through PMMO's API.
 
-These create one builder at a time:
+## Single targets
 
-- `event.item(itemOrId)`
-- `event.block(blockOrId)`
-- `event.entity(entityTypeOrId)`
-- `event.biome(id)`
-- `event.dimension(id)`
-- `event.generic(objectType, objectOrId)`
-
-For `item`, `block`, and `entity`, you can pass either the registered object or the registry id string directly.
+Use these when you need to configure one object at a time:
 
 ```js
 PmmoJS.settings(event => {
@@ -41,25 +34,13 @@ PmmoJS.settings(event => {
 })
 ```
 
-## Batch apply helpers
+Available target methods: `event.item(id)`, `event.block(id)`, `event.entity(id)`, `event.biome(id)`, `event.dimension(id)`, `event.generic(objectType, id)`.
 
-These apply the same builder callback to multiple targets:
+You can pass either the registry object or a string ID. For items, blocks, and entities, both work.
 
-- `event.items(targets, callback)`
-- `event.blocks(targets, callback)`
-- `event.entities(targets, callback)`
-- `event.biomes(targets, callback)`
-- `event.dimensions(targets, callback)`
-- `event.genericMany(objectType, targets, callback)`
+## Batch targets
 
-`targets` can be:
-
-- one id
-- one registered object
-- a JS array
-- a Java list or other iterable
-
-This is the preferred path when you want to patch many objects with the same PMMO rule.
+These apply the same configuration to many targets at once — much cleaner than repeating the same setup code:
 
 ```js
 PmmoJS.settings(event => {
@@ -83,28 +64,30 @@ PmmoJS.settings(event => {
 })
 ```
 
+Available batch methods: `event.items(targets, callback)`, `event.blocks(targets, callback)`, `event.entities(targets, callback)`, `event.biomes(targets, callback)`, `event.dimensions(targets, callback)`, `event.genericMany(objectType, targets, callback)`.
+
+The `targets` parameter accepts a single ID string, a single registry object, a JS array, or any iterable.
+
 ## Common builder methods
 
-All settings builders inherit these methods:
+All settings builders share these methods:
 
-- `setRequirement(reqType, skill, level)`
-- `requirement(reqType, map)`
-- `setXp(eventType, skill, amount)`
-- `xp(eventType, map)`
-- `override(boolean)`
+- `setRequirement(reqType, skill, level)` — require a skill level to use the object
+- `requirement(reqType, map)` — set multiple requirements at once (e.g., `{combat: 10, mining: 5}`)
+- `setXp(eventType, skill, amount)` — award XP for an action
+- `xp(eventType, map)` — set multiple XP awards at once
+- `override(boolean)` — when `true`, replace PMMO's default data instead of merging with it
 
 ## Type-specific features
 
-Depending on the builder type you also get access to:
+Depending on the builder type, you also get access to:
 
-- item salvage configuration
-- item and entity damage-type XP registration
-- positive and negative mob-effect registration
-- location mob modifiers
-- vein-miner charge configuration
-- NBT requirement, NBT XP, and NBT bonus builders
+- **Items:** salvage configuration, vein-mining settings, NBT-based requirements and XP
+- **Entities:** damage-type XP registration, positive/negative mob effects
+- **Blocks:** vein-mining data, NBT requirements
+- **Locations:** mob modifiers for biomes and dimensions
 
-Example:
+Example — configuring vein mining on an item:
 
 ```js
 PmmoJS.settings(event => {
@@ -119,42 +102,29 @@ PmmoJS.settings(event => {
 
 ## Clearing default data
 
-If you want a script-free wipe for broad PMMO categories, start with `config/pmmojs-common.toml`:
+If you want to wipe PMMO's built-in data and start from scratch, use `config/pmmojs-common.toml`:
 
-- `disableDefaultSettings.all`
-- `disableDefaultSettings.skills`
-- `disableDefaultSettings.perks`
-- `disableDefaultSettings.requirements`
-- `disableDefaultSettings.xpAwards`
-- `disableDefaultSettings.itemExtras`
-- `disableDefaultSettings.blockVeinData`
+```toml
+[disableDefaultSettings]
+all = false
+skills = false
+perks = false
+requirements = false
+xpAwards = false
+itemExtras = false
+blockVeinData = false
+```
 
-The settings event also exposes these legacy helpers:
+The reset happens before your KubeJS scripts run, so your custom data always wins.
 
-- `clearVanillaItemSettings()`
-- `clearVanillaBlockSettings()`
-- `clearVanillaEntitySettings()`
+The settings event also has legacy helpers `clearVanillaItemSettings()`, `clearVanillaBlockSettings()`, and `clearVanillaEntitySettings()`. These only reset requirement data — they don't touch XP awards, bonuses, effects, salvage, or vein data. Use the common config for full resets.
 
-Treat these as requirement-reset helpers, not as a full PMMO wipe API.
+## Enum naming
 
-They are limited to broad requirement overrides. They are not a complete reset path for:
+PMMO's enum names are case-sensitive and follow the PMMO source code exactly. Some values that trip people up:
 
-- XP awards
-- bonuses
-- positive or negative effects
-- salvage
-- vein data
-- biome or dimension settings
+- `ReqType.ENTITY_INTERACT` exists, `ReqType.ENTITY` does not
+- `EventType.BLOCK_BREAK` exists, `EventType.BREAK` does not
+- `EventType.DEATH` exists, `EventType.KILL` does not
 
-For reset order, script patterns, and the location-data limits, use [Reset Defaults](./reset-recipes).
-
-## Enum accuracy
-
-Use real PMMO enum names from the current jar. For example:
-
-- `ReqType.ENTITY_INTERACT` exists
-- `ReqType.ENTITY` does not exist
-- `EventType.BLOCK_BREAK` exists
-- `EventType.BREAK` does not exist
-- `EventType.DEATH` exists
-- `EventType.KILL` does not exist
+If you are using ProbeJS, the type completions will show you the correct values automatically.
