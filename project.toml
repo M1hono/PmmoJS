@@ -45,26 +45,38 @@ mihono = "https://maven.mihono.cn/repository/pickaid1201/"
 shedaniel = "https://maven.shedaniel.me/"
 isxander = "https://maven.isxander.dev/releases"
 
-[dependencies]
-# Generic dependency buckets stay available if this project later moves more logic out of build.gradle.
+[dependencies.mod_implementation]
+kubejs = "dev.latvian.mods:kubejs-forge:2001.6.5-build.16"
 
-[compat]
-# Legacy compatibility values still consumed by the current build.gradle.
-architectury_version = "9.2.14"
-enable_annotation = "false"
-formal_version = "true"
-kubejs_version = "2001.6.5-build.16"
-mc_user = "Togawa_Sakiko_,b6a0483d-eaf2-4be6-8395-5eecdaa310a6"
-mixin_extras_version = "0.2.0-beta.8"
-probejs_version = "5227399"
-probejs_legacy_version = "6773935"
-rhino_version = "2001.2.3-build.10"
+[dependencies.mod_compile_only]
+rhino = "dev.latvian.mods:rhino-forge:2001.2.3-build.10"
+probejs = "curse.maven:probejs-585406:5227399"
+probejs_legacy = "curse.maven:probejs-legacy-956446:6773935"
+
+[dependencies.mod_runtime_only]
+rhino = "dev.latvian.mods:rhino-forge:2001.2.3-build.10"
+architectury = "dev.architectury:architectury-forge:9.2.14"
+emi = "curse.maven:emi-580555:6420945"
+probejs = "curse.maven:probejs-585406:5227399"
+probejs_legacy = "curse.maven:probejs-legacy-956446:6773935"
 
 [publish]
 maven_url = "https://maven.mihono.cn/repository/pickaid1201/"
 curseforge_project = 0
 modrinth_project = ""
 release_type = "alpha"
+
+[publish.mods]
+game_versions = ["1.20.1"]
+loaders = ["forge"]
+
+[publish.modrinth]
+changelog_file = "CHANGELOG.md"
+changelog_section = "version"
+
+[publish.curseforge]
+changelog_file = "CHANGELOG.md"
+changelog_section = "version"
 
 [naming]
 archive_name = "Pmmo JS"

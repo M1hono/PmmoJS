@@ -1,3 +1,7 @@
+# 0.5.2
+
+- Add versioned platform upload configuration.
+
 # 0.4.12
 
 ## Highlights
